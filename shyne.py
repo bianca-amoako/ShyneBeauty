@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 
 from flask import Flask, render_template
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -192,6 +194,47 @@ class Shipment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     order = db.relationship("Order", back_populates="shipment")
+
+
+class LiveDataModelView(ModelView):
+    # Internal admin UI for live table browsing/editing during development.
+    can_view_details = True
+    can_export = True
+    page_size = 50
+    column_display_pk = True
+
+
+# Model map used to register all SQLAlchemy tables in Flask-Admin.
+MODEL_REGISTRY = {
+    Customer.__tablename__: Customer,
+    Product.__tablename__: Product,
+    Ingredient.__tablename__: Ingredient,
+    Batch.__tablename__: Batch,
+    ProductBatch.__tablename__: ProductBatch,
+    Order.__tablename__: Order,
+    OrderItem.__tablename__: OrderItem,
+    BatchIngredient.__tablename__: BatchIngredient,
+    OrderStatusEvent.__tablename__: OrderStatusEvent,
+    Shipment.__tablename__: Shipment,
+}
+
+
+admin = Admin(app, name="ShyneBeauty Admin", template_mode="bootstrap4")
+_admin_views_registered = False
+
+
+def register_admin_views():
+    global _admin_views_registered
+    if _admin_views_registered:
+        return
+
+    for table_name, model in MODEL_REGISTRY.items():
+        admin.add_view(LiveDataModelView(model, db.session, name=table_name))
+
+    _admin_views_registered = True
+
+
+register_admin_views()
 
 
 @app.route("/")
