@@ -77,6 +77,26 @@ python shyne.py
 
 4. Open: `http://localhost:8000`
 
+## Automated Testing (pytest)
+
+1. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Run tests:
+
+```bash
+pytest
+```
+
+## CI Test Runs (GitHub Actions)
+
+- Workflow: `.github/workflows/pytest.yml`
+- Runs on pull requests and pushes to main
+
+
 ## Flask Admin UI
 
 - Open `http://localhost:8000/admin` for a live SQLAlchemy admin panel.
