@@ -77,6 +77,12 @@ python shyne.py
 
 4. Open: `http://localhost:8000`
 
+## Flask Admin UI
+
+- Open `http://localhost:8000/admin` for a live SQLAlchemy admin panel.
+- You can browse, create, edit, and delete rows for all registered models.
+- No authentication yet.
+
 ## Repository Layout
 
 - `shyne.py` - Flask application entry point
