@@ -22,7 +22,9 @@ ENV/
 .vscode/
 .DS_Store
 Thumbs.db
+.internal/
 
 # Local runtime DB artifacts
 instance/*.db
+instance/*.sqlite
 instance/*.sqlite3
