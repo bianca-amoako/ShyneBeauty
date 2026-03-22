@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
 <style>
-html,body,h1,h2,h3,h4,h5 {font-family: "Raleway", sans-serif}
+html,body,h1,h2,h3,h4,h5 {font-family: "Raleway", sans-serif;}
+.auto-grow, .auto-grow-task {width:100%; overflow:hidden; resize:none;}
 </style>
 </head>
 
@@ -62,67 +63,136 @@ html,body,h1,h2,h3,h4,h5 {font-family: "Raleway", sans-serif}
 
 <div class="w3-container">
 <table class="w3-table w3-striped w3-bordered w3-white">
+  <tr class="w3-teal">
+    <th>Project</th>
+    <th>Task</th>
+    <th>Priority</th>
+    <th>Start</th>
+    <th>End</th>
+    <th>Done</th>
+    <th>Budget</th>
+  </tr>
 
-<!-- Table Headers -->
-<tr class="w3-teal">
-<th>Project</th>
-<th>Task</th>
-<th>Priority</th>
-<th>Start</th>
-<th>End</th>
-<th>Done</th>
-<th>Budget</th>
-</tr>
+  <!-- Customer 1 -->
+  <tr class="w3-light-grey">
+    <td colspan="7"><b>ANITA NJIWAH</b></td>
+  </tr>
 
-<!-- SAMPLE INPUT -->
-<!-- CUSTOMER GROUP -->
-<tr class="w3-light-grey">
-<td colspan="7"><b>ANITA NJIWAH</b></td>
-</tr>
+  <tr class="task-first-row">
+    <td rowspan="2"><textarea class="w3-input w3-border auto-grow">4 Products - Cleanser, Body Scrub</textarea></td>
+    <td><textarea class="w3-input w3-border auto-grow-task">Cleanser face</textarea></td>
+    <td>
+      <select class="w3-select w3-border">
+        <option value="">Priority</option>
+        <option>High</option><option>Medium</option><option>Low</option>
+      </select>
+    </td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input type="checkbox"></td>
+    <td rowspan="2"><textarea class="w3-input w3-border auto-grow" placeholder="$"></textarea></td>
+  </tr>
 
-<tr>
-<td>4 Products - Cleanser, Body Scrub</td>
-<td>
-<input class="w3-input w3-border" type="text" placeholder="Task name">
-</td>
-<!-- PRIORITY DROPDOWN-->
-<td>
-<select class="w3-select w3-border">
-<option value="">Priority</option>
-<option>High</option>
-<option>Medium</option>
-<option>Low</option>
-</select>
-</td>
+  <tr>
+    <td><textarea class="w3-input w3-border auto-grow-task">Body scrub</textarea></td>
+    <td>
+      <select class="w3-select w3-border">
+        <option value="">Priority</option>
+        <option>High</option><option>Medium</option><option>Low</option>
+      </select>
+    </td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input type="checkbox"></td>
+  </tr>
 
-<!-- DATE INPUT-->
-<td>
-<input class="w3-input w3-border" type="date">
-</td>
-<td>
-<input class="w3-input w3-border" type="date">
-</td>
+  <!-- Add Task Button -->
+  <tr>
+    <td colspan="6" style="text-align:center;">
+      <button class="w3-button w3-small w3-green" onclick="addCustomerTask(this)">+ Add Task</button>
+    </td>
+    <td></td>
+  </tr>
 
-<!-- DONE CHECKBOX-->
-<td>
-<input type="checkbox">
-</td>
+  <!-- Customer 2 -->
+  <tr class="w3-light-grey">
+    <td colspan="7"><b>BRANDON UMAMI</b></td>
+  </tr>
 
-<!-- BUDGET INPUT -->
-<td>
-<input class="w3-input w3-border" type="number" placeholder="$">
-</td>
-</tr>
+  <tr class="task-first-row">
+    <td rowspan="1"><textarea class="w3-input w3-border auto-grow">2 Products - Lipstick, Mascara</textarea></td>
+    <td><textarea class="w3-input w3-border auto-grow-task">Lipstick red</textarea></td>
+    <td>
+      <select class="w3-select w3-border">
+        <option value="">Priority</option>
+        <option>High</option><option>Medium</option><option>Low</option>
+      </select>
+    </td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input type="checkbox"></td>
+    <td rowspan="1"><textarea class="w3-input w3-border auto-grow" placeholder="$"></textarea></td>
+  </tr>
 
-
-<!-- NEXT CUSTOMER -->
-<tr class="w3-light-grey">
-<td colspan="7"><b>BRANDON UMAMI</b></td>
-</tr>
-
+  <tr>
+    <td colspan="6" style="text-align:center;">
+      <button class="w3-button w3-small w3-green" onclick="addCustomerTask(this)">+ Add Task</button>
+    </td>
+    <td></td>
+  </tr>
 
 </table>
 </div>
 </div>
+
+<script>
+function attachAutoGrow(textarea) {
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  });
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+document.querySelectorAll('.auto-grow, .auto-grow-task').forEach(attachAutoGrow);
+
+function addCustomerTask(button) {
+  const addButtonRow = button.closest('tr');
+  const table = addButtonRow.closest('table');
+
+  // Find the first task row in this project
+  let firstRow = addButtonRow.previousElementSibling;
+  while (!firstRow.classList.contains('task-first-row')) {
+    firstRow = firstRow.previousElementSibling;
+  }
+
+  const projectCell = firstRow.querySelector('td[rowspan]');
+  const budgetCell = firstRow.querySelectorAll('td[rowspan]')[1];
+
+  // Increase rowspan
+  projectCell.rowSpan = parseInt(projectCell.rowSpan) + 1;
+  budgetCell.rowSpan = parseInt(budgetCell.rowSpan) + 1;
+
+  // Create new task row
+  const newRow = document.createElement('tr');
+  newRow.innerHTML = `
+    <td><textarea class="w3-input w3-border auto-grow-task" placeholder="Task name"></textarea></td>
+    <td>
+      <select class="w3-select w3-border">
+        <option value="">Priority</option>
+        <option>High</option><option>Medium</option><option>Low</option>
+      </select>
+    </td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input class="w3-input w3-border" type="date"></td>
+    <td><input type="checkbox"></td>
+  `;
+
+  // Insert new task above the Add Task button
+  addButtonRow.before(newRow);
+
+  attachAutoGrow(newRow.querySelector('textarea'));
+}
+</script>
+
 </body>
 </html>
