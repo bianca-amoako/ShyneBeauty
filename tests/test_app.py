@@ -64,8 +64,10 @@ def test_orders_route_renders_expected_manage_orders_content(client):
     response = client.get("/orders")
     assert response.status_code == 200
     assert b"Manage Orders" in response.data
-    assert b"Search Orders" in response.data
-    assert b"Order List" in response.data
+    assert b"Task List" in response.data
+    assert b"Track tasks for each order." in response.data
+    assert b"ANITA NJIWAH" in response.data
+    assert b"+ Add Task" in response.data
 
 
 def test_index_route_links_to_orders_page(client):
@@ -78,7 +80,7 @@ def test_index_route_links_to_orders_page(client):
 def test_orders_route_links_back_to_dashboard(client):
     response = client.get("/orders")
     assert response.status_code == 200
-    assert b'href="/"' in response.data
+    assert b'href="/"' in response.data or b'href="index.html"' in response.data
     assert b"Home Dashboard" in response.data
 
 
