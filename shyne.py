@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 from flask import Flask, render_template
 from flask_admin import Admin
@@ -15,6 +15,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 
+def utc_now():
+    return datetime.now(UTC)
+
+
 class Customer(db.Model):
     __tablename__ = "customers"
 
@@ -28,7 +32,9 @@ class Customer(db.Model):
     state = db.Column(db.String(120))
     postal_code = db.Column(db.String(30))
     country = db.Column(db.String(120), default="USA")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     orders = db.relationship("Order", back_populates="customer", lazy=True)
 
@@ -43,7 +49,9 @@ class Product(db.Model):
     price = db.Column(db.Numeric(10, 2), nullable=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
     reorder_threshold = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     order_items = db.relationship("OrderItem", back_populates="product", lazy=True)
     product_batches = db.relationship("ProductBatch", back_populates="product", lazy=True)
@@ -59,7 +67,9 @@ class Ingredient(db.Model):
     supplier_name = db.Column(db.String(200))
     supplier_contact = db.Column(db.String(255))
     reorder_threshold = db.Column(db.Numeric(10, 3), nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     batch_ingredients = db.relationship(
         "BatchIngredient", back_populates="ingredient", lazy=True
@@ -72,8 +82,10 @@ class Batch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     batch_code = db.Column(db.String(80), unique=True, nullable=False, index=True)
     status = db.Column(db.String(50), nullable=False, default="Open")
-    started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    ended_at = db.Column(db.DateTime)
+    started_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    ended_at = db.Column(db.DateTime(timezone=True))
     notes = db.Column(db.Text)
 
     batch_ingredients = db.relationship(
@@ -96,7 +108,9 @@ class ProductBatch(db.Model):
     units_produced = db.Column(db.Integer, nullable=False, default=0)
     units_available = db.Column(db.Integer, nullable=False, default=0)
     expiry_date = db.Column(db.Date)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     batch = db.relationship("Batch", back_populates="product_batches")
     product = db.relationship("Product", back_populates="product_batches")
@@ -114,9 +128,11 @@ class Order(db.Model):
     platform = db.Column(db.String(120), nullable=False, default="Direct")
     total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     status = db.Column(db.String(50), nullable=False, default="Placed", index=True)
-    placed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    placed_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=utc_now
+    )
     updated_at = db.Column(
-        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
     )
 
     customer = db.relationship("Customer", back_populates="orders")
@@ -176,7 +192,9 @@ class OrderStatusEvent(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False, index=True)
     event_status = db.Column(db.String(60), nullable=False, index=True)
     message = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     order = db.relationship("Order", back_populates="status_events")
 
@@ -189,9 +207,11 @@ class Shipment(db.Model):
     carrier = db.Column(db.String(120))
     tracking_number = db.Column(db.String(120), unique=True, index=True)
     tracking_url = db.Column(db.String(500))
-    shipped_at = db.Column(db.DateTime)
-    delivered_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    shipped_at = db.Column(db.DateTime(timezone=True))
+    delivered_at = db.Column(db.DateTime(timezone=True))
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     order = db.relationship("Order", back_populates="shipment")
 
