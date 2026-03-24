@@ -64,6 +64,14 @@ def test_orders_route_renders_expected_manage_orders_content(client):
     response = client.get("/orders")
     assert response.status_code == 200
     assert b"Manage Orders" in response.data
+    assert b"Track customer orders from Fiverr, Square, Google Sheets, and manual entries." in response.data
+    assert b"Order List" in response.data
+    assert b"SB-1001" in response.data
+
+
+def test_tasks_route_renders_expected_task_content(client):
+    response = client.get("/tasks")
+    assert response.status_code == 200
     assert b"Task List" in response.data
     assert b"Track tasks for each order." in response.data
     assert b"ANITA NJIWAH" in response.data
@@ -84,10 +92,17 @@ def test_orders_route_links_back_to_dashboard(client):
     assert b"Home Dashboard" in response.data
 
 
+def test_shyne_icon_is_served_from_static(client):
+    response = client.get("/static/shyneIcon.png")
+    assert response.status_code == 200
+    assert response.content_type == "image/png"
+
+
 def test_orders_route_is_registered(app):
     routes = {rule.rule for rule in app.url_map.iter_rules()}
     assert "/" in routes
     assert "/orders" in routes
+    assert "/tasks" in routes
 
 
 def test_admin_route_renders_admin_shell(client):
