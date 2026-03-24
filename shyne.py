@@ -1,5 +1,5 @@
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from flask import Flask, render_template
 from flask_admin import Admin
@@ -16,7 +16,7 @@ db = SQLAlchemy(app)
 
 
 def utc_now():
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class Customer(db.Model):

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import inspect
@@ -175,7 +175,7 @@ def test_model_defaults_and_relationships_round_trip(app):
             order=order,
             event_status="Packed",
             message="Ready for shipping",
-            created_at=datetime(2026, 3, 19, 10, 30, tzinfo=UTC),
+            created_at=datetime(2026, 3, 19, 10, 30, tzinfo=timezone.utc),
         )
         shipment = Shipment(
             order=order,
