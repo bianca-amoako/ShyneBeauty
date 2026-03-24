@@ -92,6 +92,12 @@ def test_orders_route_links_back_to_dashboard(client):
     assert b"Home Dashboard" in response.data
 
 
+def test_shyne_icon_is_served_from_static(client):
+    response = client.get("/static/shyneIcon.png")
+    assert response.status_code == 200
+    assert response.content_type == "image/png"
+
+
 def test_orders_route_is_registered(app):
     routes = {rule.rule for rule in app.url_map.iter_rules()}
     assert "/" in routes
