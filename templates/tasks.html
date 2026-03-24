@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Manage Orders</title>
+  <title>Task List</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
@@ -184,7 +184,7 @@
       <i class="fa fa-remove fa-fw"></i> Close Menu
     </a>
 
-    <a href="index.html" class="w3-bar-item w3-button w3-padding">
+    <a href="/" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
     </a>
 
@@ -204,8 +204,8 @@
       <i class="fa fa-line-chart fa-fw"></i> Reports
     </a>
 
-    <a href="tasks.html" class="w3-bar-item w3-button w3-padding sb-active">
-      <i class="fa fa-cubes fa-fw"></i> Tasks
+    <a href="/tasks" class="w3-bar-item w3-button w3-padding sb-active">
+      <i class="fa fa-tasks fa-fw"></i> Tasks
     </a>
 
     <a href="#" class="w3-bar-item w3-button w3-padding">
@@ -219,7 +219,7 @@
 <div class="w3-main" style="margin-left:300px;margin-top:43px">
 
   <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-shopping-bag"></i> Task List </b></h3>
+    <h3 class="sb-heading"><b><i class="fa fa-tasks"></i> Task List</b></h3>
     <p class="sb-subtle">Track tasks for each order.</p>
   </header>
 
@@ -290,9 +290,28 @@
     <td></td>
   </tr>
 
+</table>
 </div>
 
 <script>
+const mySidebar = document.getElementById('mySidebar');
+const overlayBg = document.getElementById('myOverlay');
+
+function w3_open() {
+  if (mySidebar.style.display === 'block') {
+    mySidebar.style.display = 'none';
+    overlayBg.style.display = 'none';
+  } else {
+    mySidebar.style.display = 'block';
+    overlayBg.style.display = 'block';
+  }
+}
+
+function w3_close() {
+  mySidebar.style.display = 'none';
+  overlayBg.style.display = 'none';
+}
+
 function attachAutoGrow(textarea) {
   textarea.addEventListener('input', () => {
     textarea.style.height = 'auto';

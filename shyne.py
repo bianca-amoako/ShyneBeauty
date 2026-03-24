@@ -260,9 +260,14 @@ register_admin_views()
 @app.route("/")
 def index():
     return render_template("index.html")
-    
+
 @app.route("/orders")
 def orders():
+    return render_template("manageOrders.html")
+
+
+@app.route("/tasks")
+def tasks():
     return render_template("tasks.html")
 
 @app.cli.command("init-db")
