@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import inspect
@@ -51,7 +51,41 @@ def test_index_route_renders_expected_dashboard(client):
     response = client.get("/")
     assert response.status_code == 200
     assert response.content_type.startswith("text/html")
-    assert b"My Dashboard" in response.data
+    assert b"Home Dashboard / Analytics" in response.data
+
+
+def test_orders_route_renders(client):
+    response = client.get("/orders")
+    assert response.status_code == 200
+    assert response.content_type.startswith("text/html")
+
+
+def test_orders_route_renders_expected_manage_orders_content(client):
+    response = client.get("/orders")
+    assert response.status_code == 200
+    assert b"Manage Orders" in response.data
+    assert b"Search Orders" in response.data
+    assert b"Order List" in response.data
+
+
+def test_index_route_links_to_orders_page(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'href="/orders"' in response.data
+    assert b"Manage Orders" in response.data
+
+
+def test_orders_route_links_back_to_dashboard(client):
+    response = client.get("/orders")
+    assert response.status_code == 200
+    assert b'href="/"' in response.data
+    assert b"Home Dashboard" in response.data
+
+
+def test_orders_route_is_registered(app):
+    routes = {rule.rule for rule in app.url_map.iter_rules()}
+    assert "/" in routes
+    assert "/orders" in routes
 
 
 def test_admin_route_renders_admin_shell(client):
@@ -81,6 +115,18 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
         "order_status_events",
         "shipments",
     }.issubset(set(inspector.get_table_names()))
+
+
+def test_init_db_cli_command_is_idempotent(app):
+    runner = app.test_cli_runner()
+
+    first_result = runner.invoke(args=["init-db"])
+    second_result = runner.invoke(args=["init-db"])
+
+    assert first_result.exit_code == 0
+    assert second_result.exit_code == 0
+    assert "Database initialized." in first_result.output
+    assert "Database initialized." in second_result.output
 
 
 
@@ -129,7 +175,7 @@ def test_model_defaults_and_relationships_round_trip(app):
             order=order,
             event_status="Packed",
             message="Ready for shipping",
-            created_at=datetime(2026, 3, 19, 10, 30),
+            created_at=datetime(2026, 3, 19, 10, 30, tzinfo=UTC),
         )
         shipment = Shipment(
             order=order,
