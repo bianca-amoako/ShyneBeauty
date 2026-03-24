@@ -1,128 +1,378 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Project Tasks</title>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <title>Manage Orders</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
-<style>
-html,body,h1,h2,h3,h4,h5 {font-family: "Raleway", sans-serif}
-</style>
+  <style>
+    html, body, h1, h2, h3, h4, h5 {
+      font-family: "Raleway", sans-serif;
+    }
+
+    body {
+      background-color: #f6f3ee;
+      color: #4f4a45;
+    }
+
+    .sb-topbar {
+      background: linear-gradient(to right, #e7d8c3, #f3eadc);
+      color: #5f5a54;
+      border-bottom: 2px solid #d7c3aa;
+    }
+
+    .sb-topbar .w3-bar-item {
+      color: #5f5a54 !important;
+      font-weight: 600;
+    }
+
+    .sb-sidebar {
+      background-color: #fcfaf7;
+      color: #5f5a54;
+      border-right: 1px solid #eadfce;
+    }
+
+    .sb-sidebar .w3-bar-item {
+      color: #5f5a54;
+      font-weight: 500;
+    }
+
+    .sb-sidebar .w3-bar-item:hover {
+      background-color: #d7ece8 !important;
+      color: #4c4a46 !important;
+    }
+
+    .sb-active {
+      background-color: #bfe3df !important;
+      color: #4c4a46 !important;
+      font-weight: bold;
+    }
+
+    .card-round {
+      border-radius: 12px;
+    }
+
+    .section-space {
+      margin-top: 18px;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    .sb-panel {
+      background-color: #ffffff;
+      color: #4f4a45;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-radius: 12px;
+    }
+
+    .sb-heading {
+      color: #7c746c;
+      letter-spacing: 0.5px;
+    }
+
+    .sb-subtle {
+      color: #7a746d;
+    }
+
+    .sb-table th {
+      background-color: #bfe3df;
+      color: #4c4a46;
+    }
+
+    .sb-button {
+      background-color: #bfe3df;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button:hover {
+      background-color: #a9d6d0 !important;
+      color: #3f3b37 !important;
+    }
+
+    .sb-button-warm {
+      background-color: #e8d5bd;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button-warm:hover {
+      background-color: #dcc3a5 !important;
+      color: #3f3b37 !important;
+    }
+
+    .sb-tag-aqua {
+      background-color: #bfe3df;
+      color: #3f3b37;
+    }
+
+    .sb-tag-beige {
+      background-color: #eadbc8;
+      color: #4c4a46;
+    }
+
+    .sb-tag-soft {
+      background-color: #f0e7dc;
+      color: #4c4a46;
+    }
+  </style>
 </head>
 
 <body class="w3-light-grey">
-    <!-- TOP BAR -->
-<div class="w3-bar w3-top w3-black w3-large" style="z-index:4">
-    <button class="w3-bar-item w3-button w3-hide-large w3-hover-none w3-hover-text-light-grey" onclick="w3_open();"><i class="fa fa-bars"></i>  Menu</button>
-    <span class="w3-bar-item w3-right">Logo</span>
+
+<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
+  <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
+    <i class="fa fa-bars"></i> Menu
+  </button>
+  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
 </div>
-    <!-- SIDE MENU -->
-<nav class="w3-sidebar w3-collapse w3-white w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
-    <div class="w3-container w3-row">
-        <div class="w3-col s4">
-            <img src="/w3images/avatar2.png" class="w3-circle w3-margin-right" style="width:46px">
-        </div>
-        <div class="w3-col s8 w3-bar">
-            <span>Welcome, <strong>Brittany</strong></span><br>
-            <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
-            <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
-            <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
-        </div>
+
+<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
+  <div class="w3-container w3-row">
+    <div class="w3-col s4">
+      <img src="/w3images/avatar2.png" class="w3-circle w3-margin-right" style="width:46px">
     </div>
-    <hr>
-        <div class="w3-container">
-            <h5>Dashboard</h5>
-        </div>
-        <div class="w3-bar-block">
-            <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-dark-grey w3-hover-black" onclick="w3_close()" title="close menu"><i class="fa fa-remove fa-fw"></i>  Close Menu</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding w3-blue"><i class="fa fa-users fa-fw"></i>  Overview</a>
+    <div class="w3-col s8 w3-bar">
+      <span>Welcome, <strong>Brittany</strong></span><br>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
+    </div>
+  </div>
+  <hr>
 
-            <a href="tasks.html" class="w3-bar-item w3-button w3-padding"><i class="fa fa-tasks fa-fw"></i>  Tasks</a>
-            <a href="customers.html" class="w3-bar-item w3-button w3-padding"><i class="fa fa-address-book fa-fw"></i>  Customers</a>
+  <div class="w3-container">
+    <h5 class="sb-heading">Dashboard</h5>
+  </div>
 
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-bullseye fa-fw"></i>  Geo</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-diamond fa-fw"></i>  Orders</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-bell fa-fw"></i>  News</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-bank fa-fw"></i>  General</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-history fa-fw"></i>  History</a>
-            <a href="#" class="w3-bar-item w3-button w3-padding"><i class="fa fa-cog fa-fw"></i>  Settings</a><br><br>
-        </div>
+  <div class="w3-bar-block">
+    <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-hover-black" onclick="w3_close()">
+      <i class="fa fa-remove fa-fw"></i> Close Menu
+    </a>
 
+    <a href="/" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
+    </a>
 
+    <a href="/orders" class="w3-bar-item w3-button w3-padding sb-active">
+      <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-cubes fa-fw"></i> Inventory
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-folder-open fa-fw"></i> Files
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-line-chart fa-fw"></i> Reports
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-cog fa-fw"></i> Settings
+    </a><br><br>
+  </div>
 </nav>
+
+<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
 
 <div class="w3-main" style="margin-left:300px;margin-top:43px">
 
-<header class="w3-container">
-    <h3><b><i class="fa fa-tasks"></i> Project Task List</b></h3>
-</header>
+  <header class="w3-container" style="padding-top:22px">
+    <h3 class="sb-heading"><b><i class="fa fa-shopping-bag"></i> Manage Orders</b></h3>
+    <p class="sb-subtle">Track customer orders from Fiverr, Square, Google Sheets, and manual entries.</p>
+  </header>
 
-<div class="w3-container">
-<table class="w3-table w3-striped w3-bordered w3-white">
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <div class="w3-row-padding">
+      <div class="w3-third">
+        <label><b>Search Orders</b></label>
+        <input class="w3-input w3-border" type="text" placeholder="Search by order ID, customer, or product">
+      </div>
 
-<!-- Table Headers -->
-<tr class="w3-teal">
-<th>Project</th>
-<th>Task</th>
-<th>Priority</th>
-<th>Start</th>
-<th>End</th>
-<th>Done</th>
-<th>Budget</th>
-</tr>
+      <div class="w3-third">
+        <label><b>Source</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Sources</option>
+          <option>Fiverr</option>
+          <option>Square</option>
+          <option>Google Sheets</option>
+          <option>Manual Entry</option>
+        </select>
+      </div>
 
-<!-- SAMPLE INPUT -->
-<!-- CUSTOMER GROUP -->
-<tr class="w3-light-grey">
-<td colspan="7"><b>ANITA NJIWAH</b></td>
-</tr>
+      <div class="w3-third">
+        <label><b>Status</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Statuses</option>
+          <option>New</option>
+          <option>In Progress</option>
+          <option>Waiting for Ingredients</option>
+          <option>Packed</option>
+          <option>Shipped</option>
+          <option>Completed</option>
+        </select>
+      </div>
+    </div>
 
-<tr>
-<td>4 Products - Cleanser, Body Scrub</td>
-<td>
-<input class="w3-input w3-border" type="text" placeholder="Task name">
-</td>
-<!-- PRIORITY DROPDOWN-->
-<td>
-<select class="w3-select w3-border">
-<option value="">Priority</option>
-<option>High</option>
-<option>Medium</option>
-<option>Low</option>
-</select>
-</td>
+    <div class="w3-margin-top">
+      <button class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
+      <button class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</button>
+      <button class="w3-button sb-button-warm w3-right"><i class="fa fa-plus"></i> Add Order</button>
+    </div>
+  </div>
 
-<!-- DATE INPUT-->
-<td>
-<input class="w3-input w3-border" type="date">
-</td>
-<td>
-<input class="w3-input w3-border" type="date">
-</td>
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <h5 class="sb-heading">Order List</h5>
 
-<!-- DONE CHECKBOX-->
-<td>
-<input type="checkbox">
-</td>
+    <div class="table-scroll">
+      <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Source</th>
+          <th>Products</th>
+          <th>Status</th>
+          <th>Order Date</th>
+          <th>Ship Date</th>
+          <th>Total</th>
+          <th>Actions</th>
+        </tr>
 
-<!-- BUDGET INPUT -->
-<td>
-<input class="w3-input w3-border" type="number" placeholder="$">
-</td>
-</tr>
+        <tr>
+          <td>SB-1001</td>
+          <td>Anita Njiwah</td>
+          <td>Fiverr</td>
+          <td>Cleanser, Body Scrub</td>
+          <td><span class="w3-tag sb-tag-beige">In Progress</span></td>
+          <td>03/20/2026</td>
+          <td>03/24/2026</td>
+          <td>$42.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
 
+        <tr>
+          <td>SB-1002</td>
+          <td>Brandon Umami</td>
+          <td>Square</td>
+          <td>Body Butter, Lip Scrub</td>
+          <td><span class="w3-tag sb-tag-aqua">Packed</span></td>
+          <td>03/19/2026</td>
+          <td>03/23/2026</td>
+          <td>$36.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
 
-<!-- NEXT CUSTOMER -->
-<tr class="w3-light-grey">
-<td colspan="7"><b>BRANDON UMAMI</b></td>
-</tr>
+        <tr>
+          <td>SB-1003</td>
+          <td>Jasmine Lee</td>
+          <td>Google Sheets</td>
+          <td>Whipped Soap</td>
+          <td><span class="w3-tag sb-tag-aqua">Shipped</span></td>
+          <td>03/18/2026</td>
+          <td>03/21/2026</td>
+          <td>$19.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
 
+        <tr>
+          <td>SB-1004</td>
+          <td>Naomi Reed</td>
+          <td>Manual Entry</td>
+          <td>Body Oil, Sugar Scrub</td>
+          <td><span class="w3-tag sb-tag-soft">Waiting for Ingredients</span></td>
+          <td>03/17/2026</td>
+          <td>03/25/2026</td>
+          <td>$31.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
 
-</table>
+        <tr>
+          <td>SB-1005</td>
+          <td>Tanya Moore</td>
+          <td>Fiverr</td>
+          <td>Sugar Scrub Set</td>
+          <td><span class="w3-tag sb-tag-beige">New</span></td>
+          <td>03/22/2026</td>
+          <td>Pending</td>
+          <td>$27.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="w3-row-padding w3-margin-top w3-margin-bottom">
+    <div class="w3-half">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Order Status Workflow</h5>
+        <ul class="w3-ul">
+          <li>New</li>
+          <li>In Progress</li>
+          <li>Waiting for Ingredients</li>
+          <li>Packed</li>
+          <li>Shipped</li>
+          <li>Completed</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="w3-half">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Page Purpose</h5>
+        <p>
+          This page is meant to give the stakeholder one central place to view and manage orders instead of switching between Fiverr, Square, Google Sheets, and Google Drive.
+        </p>
+        <p>
+          In the full version, the table will be connected to the Flask backend and database instead of using sample data.
+        </p>
+      </div>
+    </div>
+  </div>
+
 </div>
-</div>
+
+<script>
+  var mySidebar = document.getElementById("mySidebar");
+  var overlayBg = document.getElementById("myOverlay");
+
+  function w3_open() {
+    if (mySidebar.style.display === "block") {
+      mySidebar.style.display = "none";
+      overlayBg.style.display = "none";
+    } else {
+      mySidebar.style.display = "block";
+      overlayBg.style.display = "block";
+    }
+  }
+
+  function w3_close() {
+    mySidebar.style.display = "none";
+    overlayBg.style.display = "none";
+  }
+</script>
+
 </body>
 </html>
