@@ -148,6 +148,23 @@
     .sb-logo-title {
       letter-spacing: 1px;
     }
+
+    .sb-logout-form {
+      margin-top: 12px;
+    }
+
+    .sb-logout-button {
+      background-color: #f0e7dc;
+      color: #4c4a46;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+    }
+
+    .sb-logout-button:hover {
+      background-color: #e8d5bd !important;
+      color: #3f3b37 !important;
+    }
   </style>
 </head>
 <body class="w3-light-grey">
@@ -165,10 +182,15 @@
       <img src="{{ url_for('static', filename='shyneIcon.png') }}" class="w3-circle w3-margin-right" style="width:46px">
     </div>
     <div class="w3-col s8 w3-bar">
-      <span>Welcome, <strong>Brittany</strong></span><br>
+      <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
+      <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
+        <button type="submit" class="w3-button sb-logout-button">
+          <i class="fa fa-sign-out"></i> Log out
+        </button>
+      </form>
     </div>
   </div>
   <hr>

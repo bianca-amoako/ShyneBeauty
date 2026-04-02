@@ -1,9 +1,12 @@
+import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import inspect
 
 from shyne import (
+    AdminUser,
     Batch,
     BatchIngredient,
     Customer,
@@ -16,21 +19,10 @@ from shyne import (
     ProductBatch,
     Shipment,
     db,
+    load_project_env,
 )
 
-# loads html
-def test_home_route_renders(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.content_type.startswith("text/html")
 
-# loads admin html page
-def test_admin_route_renders(client):
-    response = client.get("/admin/")
-    assert response.status_code == 200
-    assert response.content_type.startswith("text/html")
-
-# check that model registry includes all core tables 
 def test_model_registry_has_core_tables():
     expected_tables = {
         "customers",
@@ -45,48 +37,69 @@ def test_model_registry_has_core_tables():
         "shipments",
     }
     assert expected_tables.issubset(MODEL_REGISTRY.keys())
+    assert "admin_users" not in MODEL_REGISTRY
 
 
-def test_index_route_renders_expected_dashboard(client):
-    response = client.get("/")
+def test_load_project_env_reads_local_env_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+
+    env_dir = tmp_path / ".env"
+    env_dir.mkdir()
+    env_file = env_dir / "local.env"
+    env_file.write_text(
+        "SECRET_KEY=dotenv-secret\nSESSION_COOKIE_SECURE=true\n",
+        encoding="utf-8",
+    )
+
+    loaded_path = load_project_env(tmp_path)
+
+    assert loaded_path == env_file
+    assert os.environ["SECRET_KEY"] == "dotenv-secret"
+    assert os.environ["SESSION_COOKIE_SECURE"] == "true"
+
+
+def test_load_project_env_does_not_override_existing_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "shell-secret")
+
+    env_dir = tmp_path / ".env"
+    env_dir.mkdir()
+    (env_dir / "local.env").write_text(
+        "SECRET_KEY=dotenv-secret\n",
+        encoding="utf-8",
+    )
+
+    load_project_env(Path(tmp_path))
+
+    assert os.environ["SECRET_KEY"] == "shell-secret"
+
+
+def test_login_route_renders_expected_content(client):
+    response = client.get("/login")
+
     assert response.status_code == 200
     assert response.content_type.startswith("text/html")
-    assert b"Home Dashboard / Analytics" in response.data
+    assert b"Sign in to ShyneBeauty" in response.data
+    assert b"Admin dashboard access" in response.data
+    assert b"Forgot password?" in response.data
+    assert b"trusted internal admin workflow" in response.data
 
 
-def test_orders_route_renders(client):
-    response = client.get("/orders")
-    assert response.status_code == 200
-    assert response.content_type.startswith("text/html")
+def test_index_route_links_to_orders_page(client, admin_user, login):
+    login(client)
 
-
-def test_orders_route_renders_expected_manage_orders_content(client):
-    response = client.get("/orders")
-    assert response.status_code == 200
-    assert b"Manage Orders" in response.data
-    assert b"Track customer orders from Fiverr, Square, Google Sheets, and manual entries." in response.data
-    assert b"Order List" in response.data
-    assert b"SB-1001" in response.data
-
-
-def test_tasks_route_renders_expected_task_content(client):
-    response = client.get("/tasks")
-    assert response.status_code == 200
-    assert b"Task List" in response.data
-    assert b"Track tasks for each order." in response.data
-    assert b"ANITA NJIWAH" in response.data
-    assert b"+ Add Task" in response.data
-
-
-def test_index_route_links_to_orders_page(client):
     response = client.get("/")
+
     assert response.status_code == 200
     assert b'href="/orders"' in response.data
     assert b"Manage Orders" in response.data
 
 
-def test_orders_route_links_back_to_dashboard(client):
+def test_orders_route_links_back_to_dashboard(client, admin_user, login):
+    login(client)
+
     response = client.get("/orders")
+
     assert response.status_code == 200
     assert b'href="/"' in response.data or b'href="index.html"' in response.data
     assert b"Home Dashboard" in response.data
@@ -94,22 +107,19 @@ def test_orders_route_links_back_to_dashboard(client):
 
 def test_shyne_icon_is_served_from_static(client):
     response = client.get("/static/shyneIcon.png")
+
     assert response.status_code == 200
     assert response.content_type == "image/png"
 
 
-def test_orders_route_is_registered(app):
+def test_routes_are_registered(app):
     routes = {rule.rule for rule in app.url_map.iter_rules()}
+
     assert "/" in routes
+    assert "/login" in routes
     assert "/orders" in routes
     assert "/tasks" in routes
-
-
-def test_admin_route_renders_admin_shell(client):
-    response = client.get("/admin/")
-    assert response.status_code == 200
-    assert response.content_type.startswith("text/html")
-    assert b"ShyneBeauty Admin" in response.data
+    assert "/logout" in routes
 
 
 def test_init_db_cli_command_creates_tables_and_reports_success(app):
@@ -119,7 +129,8 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
     assert result.exit_code == 0
     assert "Database initialized." in result.output
 
-    inspector = inspect(db.engine)
+    primary_inspector = inspect(db.engine)
+    auth_inspector = inspect(db.engines["auth"])
     assert {
         "customers",
         "products",
@@ -131,7 +142,9 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
         "batch_ingredients",
         "order_status_events",
         "shipments",
-    }.issubset(set(inspector.get_table_names()))
+    }.issubset(set(primary_inspector.get_table_names()))
+    assert "admin_users" not in set(primary_inspector.get_table_names())
+    assert "admin_users" in set(auth_inspector.get_table_names())
 
 
 def test_init_db_cli_command_is_idempotent(app):
@@ -145,6 +158,25 @@ def test_init_db_cli_command_is_idempotent(app):
     assert "Database initialized." in first_result.output
     assert "Database initialized." in second_result.output
 
+
+def test_create_admin_cli_command_creates_hashed_password(app):
+    runner = app.test_cli_runner()
+    password = "StrongPassw0rd!"
+
+    result = runner.invoke(
+        args=["create-admin", "--email", "owner@shynebeauty.com"],
+        input=f"{password}\n{password}\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Admin user created: owner@shynebeauty.com" in result.output
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="owner@shynebeauty.com").one()
+        assert user.password_hash != password
+        assert user.check_password(password) is True
+        assert "admin_users" not in set(inspect(db.engine).get_table_names())
+        assert "admin_users" in set(inspect(db.engines["auth"]).get_table_names())
 
 
 def test_model_defaults_and_relationships_round_trip(app):

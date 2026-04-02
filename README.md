@@ -67,7 +67,6 @@ GitHub Actions workflows:
 - `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
 
-
 ## Repository Layout
 
 - `shyne.py`: application setup, models, auth flow, routes, admin registration,
