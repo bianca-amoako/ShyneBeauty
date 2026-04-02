@@ -62,6 +62,34 @@ def client(app):
 
 
 @pytest.fixture()
+def login():
+    def _login(
+        client,
+        *,
+        email="admin@shynebeauty.com",
+        password="correct-horse-battery-staple",
+        remember_me=False,
+        next_url=None,
+    ):
+        data = {
+            "email": email,
+            "password": password,
+        }
+        if remember_me:
+            data["remember_me"] = "on"
+        if next_url is not None:
+            data["next"] = next_url
+
+        return client.post(
+            "/login",
+            data=data,
+            query_string={"next": next_url} if next_url is not None else None,
+        )
+
+    return _login
+
+
+@pytest.fixture()
 def admin_user(app):
     with app.app_context():
         user = AdminUser(

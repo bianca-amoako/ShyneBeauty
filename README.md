@@ -1,6 +1,6 @@
 # ShyneBeauty
 
-ShyneBeauty is a single-file Flask application for running the internal
+ShyneBeauty is a Flask application for running the internal
 operations of a small skincare business. The current app centralizes customer,
 order, inventory, batch, shipment, and order-status data models while exposing
 protected admin screens plus a live Flask-Admin surface for internal use.
@@ -29,9 +29,9 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 5. Create an admin account with
    `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
 6. Start the dev server with `python shyne.py`.
-7. Open `http://localhost:8000/login` and sign in before using protected pages.
+7. Open `http://localhost:8000/login` and sign in.
 
-Example PowerShell setup:
+Example setup:
 
 ```powershell
 python -m venv .venv-windows
@@ -43,12 +43,12 @@ flask --app shyne.py create-admin --email owner@shynebeauty.com
 python shyne.py
 ```
 
-Optional runtime variables:
+Optional variables:
 
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL`
-- `FLASK_DEBUG=true` for local debugging only
-- `SESSION_COOKIE_SECURE=true` for HTTPS deployments
+- `FLASK_DEBUG=true` for debugging
+- `SESSION_COOKIE_SECURE=true` for HTTPS
 
 ## Testing And CI
 
@@ -67,19 +67,6 @@ GitHub Actions workflows:
 - `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
 
-## Security And Admin Notes
-
-- See `SECURITY.md` for the current login security posture, remaining risks, and
-  follow-up recommendations.
-- Admin auth is internal-only and currently backed by the `AdminUser` model in
-  a dedicated auth database bind.
-- Protected routes are `/`, `/orders`, `/tasks`, and `/admin/`.
-- Flask-Admin should be treated as development/internal tooling, not a
-  production-ready public admin product.
-- The app now sets a small response-header baseline, but still has known
-  hardening gaps such as missing CSRF protection, coarse-grained
-  authorization, and other follow-up controls.
-
 ## Repository Layout
 
 - `shyne.py`: application setup, models, auth flow, routes, admin registration,
@@ -93,15 +80,3 @@ GitHub Actions workflows:
   risks
 - `requirements.txt`: runtime and test dependencies
 - `.github/workflows/`: CI and code-scanning workflows
-
-## Known Gaps
-
-- The dashboard, orders, and tasks pages are still prototype screens with
-  sample data.
-- Schema migrations are not implemented yet; the current workflow still relies
-  on `init-db` and `db.create_all()`.
-- Normal `python shyne.py` startup no longer bootstraps the database
-  automatically; initialize schema intentionally with `flask --app shyne.py
-  init-db`.
-- The repo remains centered on a single `shyne.py` module, so most non-trivial
-  behavior changes converge on one file.
