@@ -1,109 +1,107 @@
 # ShyneBeauty
 
-ShyneBeauty is a Flask-based web application for managing a small skincare business.  
-The project goal is to replace fragmented spreadsheet/marketplace workflows with one system for customer data, order lifecycle, inventory, and production batches.
+ShyneBeauty is a single-file Flask application for running the internal
+operations of a small skincare business. The current app centralizes customer,
+order, inventory, batch, shipment, and order-status data models while exposing
+protected admin screens plus a live Flask-Admin surface for internal use.
 
-## Current Status
+## Current App State
 
-- Current runnable code is an early Flask scaffold (`shyne.py`) with a rendered dashboard template.
-- Most business functionality is defined in the project documentation and is still being implemented.
-
-
-## Project Goals
-
-- Centralize customer, order, and inventory data.
-- Track ingredient usage and production batches.
-- Give customers simple order-status visibility.
-- Reduce manual errors in a single-owner workflow.
-- Keep the admin workflow straightforward and fast.
-
-## Planned Functional Areas
-
-- Product catalog management
-- Ingredient inventory tracking
-- Batch production and finished-goods tracking
-- Order fulfillment and shipment tracking
-- Order status timeline events for customers
-- Reporting for sales, inventory, and production
-
-## Technical Requirements
-
-### Python
-
-- Python `3.10+` recommended
-
-### Flask Requirements
-
-Flask is the web framework for routing and template rendering.
-
-- Route handlers for admin and customer-facing pages
-- Jinja template rendering (`render_template`)
-- Environment-based config for development/production
-- Form/API validation and error handling
-
-### SQL Requirements
-
-A relational SQL database is required to keep business data consistent and queryable.
-
-- Core entities: `Customer`, `Order`, `OrderItem`, `Product`, `Ingredient`, `Batch`, `BatchIngredient`, `ProductBatch`, `Shipment`, `OrderStatusEvent`
-- Primary and foreign keys for traceability across ordering and production
-- Indexed lookup paths for common queries (orders, status, inventory levels)
-- Transaction-safe updates when fulfillment changes order + inventory together
-- Backup and restore procedures for reliability
-
-### SQLAlchemy Requirements
-
-SQLAlchemy is the planned data access layer.
-
-- ORM models for each core table
-- Explicit relationships (for example: `Customer -> Order -> OrderItem`)
-- Session/transaction handling for atomic updates
-- Schema migration workflow (Alembic/Flask-Migrate recommended)
+- `shyne.py` contains the Flask app setup, SQLAlchemy models, Flask-Login auth
+  flow, Flask-Admin registration, routes, and CLI commands.
+- `/login` is a live admin sign-in flow with safe redirect handling, generic
+  credential failure messaging, remember-me support, and account lockout after
+  repeated failed attempts.
+- `/`, `/orders`, and `/tasks` are protected admin pages rendered with Jinja
+  templates. They currently show prototype/sample content rather than live
+  query-backed business data.
+- `/admin/` is protected behind admin authentication and exposes registered
+  business tables through Flask-Admin for local/internal development work.
+- CI runs pytest on Python 3.10 and 3.12 and also runs CodeQL analysis.
 
 ## Local Setup
 
 1. Create and activate a virtual environment.
-2. Install dependencies:
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Set `SECRET_KEY` before starting the app. The runtime will also load values
+   from `.env`, `.env/local.env`, or `.env/.env` when present.
+4. Initialize the databases with `flask --app shyne.py init-db`.
+5. Create an admin account with
+   `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
+6. Start the dev server with `python shyne.py`.
+7. Open `http://localhost:8000/login` and sign in before using protected pages.
 
-```bash
+Example PowerShell setup:
+
+```powershell
+python -m venv .venv-windows
+.\.venv-windows\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
-
-3. Run the app:
-
-```bash
+$env:SECRET_KEY = "replace-with-a-local-secret"
+flask --app shyne.py init-db
+flask --app shyne.py create-admin --email owner@shynebeauty.com
 python shyne.py
 ```
 
-4. Open: `http://localhost:8000`
+Optional runtime variables:
 
-## Automated Testing (pytest)
+- `DATABASE_URL`
+- `AUTH_DATABASE_URL`
+- `FLASK_DEBUG=true` for local debugging only
+- `SESSION_COOKIE_SECURE=true` for HTTPS deployments
 
-1. Install dependencies:
+## Testing And CI
 
-```bash
-pip install -r requirements.txt
+Run the local test suite with one of these commands:
+
+```powershell
+.\.venv-windows\Scripts\python.exe -m pytest -q
 ```
 
-2. Run tests:
-
 ```bash
-pytest
+python -m pytest -q
 ```
 
-## CI Test Runs (GitHub Actions)
+GitHub Actions workflows:
 
-- Workflow: `.github/workflows/pytest.yml`
-- Runs on pull requests and pushes to main
+- `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
+- `.github/workflows/codeql.yml` runs CodeQL security analysis
 
+## Security And Admin Notes
 
-## Flask Admin UI
-
-- Open `http://localhost:8000/admin` for a live SQLAlchemy admin panel.
-- You can browse, create, edit, and delete rows for all registered models.
-- No authentication yet.
+- See `SECURITY.md` for the current login security posture, remaining risks, and
+  follow-up recommendations.
+- Admin auth is internal-only and currently backed by the `AdminUser` model in
+  a dedicated auth database bind.
+- Protected routes are `/`, `/orders`, `/tasks`, and `/admin/`.
+- Flask-Admin should be treated as development/internal tooling, not a
+  production-ready public admin product.
+- The app now sets a small response-header baseline, but still has known
+  hardening gaps such as missing CSRF protection, coarse-grained
+  authorization, and other follow-up controls.
 
 ## Repository Layout
 
-- `shyne.py` - Flask application entry point
-- `templates/index.html` - current dashboard template
+- `shyne.py`: application setup, models, auth flow, routes, admin registration,
+  and CLI commands
+- `templates/`: Jinja templates for the current UI surfaces
+- `static/`: shared frontend assets such as `shyneIcon.png`
+- `tests/`: pytest coverage for auth, protected routes, CLI commands, and model
+  behavior
+- `schema.sql`: reference schema for the business tables
+- `SECURITY.md`: tracked summary of the current security posture and known auth
+  risks
+- `requirements.txt`: runtime and test dependencies
+- `.github/workflows/`: CI and code-scanning workflows
+
+## Known Gaps
+
+- The dashboard, orders, and tasks pages are still prototype screens with
+  sample data.
+- Schema migrations are not implemented yet; the current workflow still relies
+  on `init-db` and `db.create_all()`.
+- Normal `python shyne.py` startup no longer bootstraps the database
+  automatically; initialize schema intentionally with `flask --app shyne.py
+  init-db`.
+- The repo remains centered on a single `shyne.py` module, so most non-trivial
+  behavior changes converge on one file.
