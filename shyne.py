@@ -1,22 +1,197 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from urllib.parse import urlsplit
 
-from flask import Flask, render_template
-from flask_admin import Admin
+import click
+from dotenv import dotenv_values
+from flask import (
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_admin import Admin, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import validates
+from werkzeug.security import check_password_hash, generate_password_hash
+
+FAILED_LOGIN_THRESHOLD = 5
+ACCOUNT_LOCK_DURATION = timedelta(minutes=15)
+BASE_DIR = Path(__file__).resolve().parent
+AUTH_BIND_KEY = "auth"
+SECURITY_HEADERS = {
+    "Referrer-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+}
+NO_STORE_ENDPOINTS = {"index", "login", "logout", "orders", "tasks"}
+
+
+def require_env(name):
+    value = os.getenv(name)
+    if value:
+        return value
+    raise RuntimeError(f"{name} environment variable must be set.")
+
+
+def env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def dotenv_candidates(base_dir=BASE_DIR):
+    base_path = Path(base_dir)
+    return (
+        base_path / ".env",
+        base_path / ".env" / "local.env",
+        base_path / ".env" / ".env",
+    )
+
+
+def load_project_env(base_dir=BASE_DIR):
+    for candidate in dotenv_candidates(base_dir):
+        if not candidate.is_file():
+            continue
+
+        for key, value in dotenv_values(candidate).items():
+            if value is not None and key not in os.environ:
+                os.environ[key] = value
+        return candidate
+
+    return None
+
+
+load_project_env()
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = require_env("SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "DATABASE_URL", "sqlite:///shynebeauty.db"
 )
+app.config["SQLALCHEMY_BINDS"] = {
+    AUTH_BIND_KEY: os.getenv("AUTH_DATABASE_URL", "sqlite:///shynebeauty_auth.db")
+}
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = env_flag("SESSION_COOKIE_SECURE", default=False)
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+app.config["REMEMBER_COOKIE_SECURE"] = app.config["SESSION_COOKIE_SECURE"]
 
 db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please sign in to continue."
+login_manager.login_message_category = "info"
 
 
 def utc_now():
     return datetime.now(timezone.utc)
+
+
+def ensure_utc(value):
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
+def normalize_email(value):
+    return (value or "").strip().lower()
+
+
+def is_safe_next_target(target):
+    if not target:
+        return False
+
+    candidate = target.strip()
+    if not candidate.startswith("/") or candidate.startswith("//") or candidate.startswith("/\\"):
+        return False
+
+    parts = urlsplit(candidate)
+    return not parts.scheme and not parts.netloc
+
+
+def get_safe_next_target(target):
+    if is_safe_next_target(target):
+        return target.strip()
+    return ""
+
+
+def current_request_next_target():
+    if request.query_string:
+        return f"{request.path}?{request.query_string.decode('utf-8')}"
+    return request.path
+
+
+class AdminUser(UserMixin, db.Model):
+    __bind_key__ = AUTH_BIND_KEY
+    __tablename__ = "admin_users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    full_name = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    failed_login_count = db.Column(db.Integer, nullable=False, default=0)
+    locked_until = db.Column(db.DateTime(timezone=True))
+    last_login_at = db.Column(db.DateTime(timezone=True))
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    @validates("email")
+    def validate_email(self, _key, value):
+        normalized = normalize_email(value)
+        if not normalized:
+            raise ValueError("Email is required.")
+        return normalized
+
+    def set_password(self, password):
+        if not password:
+            raise ValueError("Password is required.")
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+
+    def is_locked(self, now=None):
+        if self.locked_until is None:
+            return False
+        comparison_time = now or utc_now()
+        return ensure_utc(self.locked_until) > comparison_time
+
+    def register_failed_login(self, now=None):
+        comparison_time = now or utc_now()
+
+        if self.locked_until and not self.is_locked(comparison_time):
+            self.failed_login_count = 0
+            self.locked_until = None
+
+        self.failed_login_count += 1
+        if self.failed_login_count >= FAILED_LOGIN_THRESHOLD:
+            self.locked_until = comparison_time + ACCOUNT_LOCK_DURATION
+
+    def reset_login_state(self):
+        self.failed_login_count = 0
+        self.locked_until = None
 
 
 class Customer(db.Model):
@@ -216,12 +391,26 @@ class Shipment(db.Model):
     order = db.relationship("Order", back_populates="shipment")
 
 
+class SecureAdminIndexView(AdminIndexView):
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.is_active
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for("login", next=current_request_next_target()))
+
+
 class LiveDataModelView(ModelView):
     # Internal admin UI for live table browsing/editing during development.
     can_view_details = True
     can_export = True
     page_size = 50
     column_display_pk = True
+
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.is_active
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for("login", next=current_request_next_target()))
 
 
 # Model map used to register all SQLAlchemy tables in Flask-Admin.
@@ -239,7 +428,12 @@ MODEL_REGISTRY = {
 }
 
 
-admin = Admin(app, name="ShyneBeauty Admin", template_mode="bootstrap4")
+admin = Admin(
+    app,
+    name="ShyneBeauty Admin",
+    template_mode="bootstrap4",
+    index_view=SecureAdminIndexView(url="/admin/"),
+)
 _admin_views_registered = False
 
 
@@ -257,26 +451,163 @@ def register_admin_views():
 register_admin_views()
 
 
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        return db.session.get(AdminUser, int(user_id))
+    except (TypeError, ValueError):
+        return None
+
+
+@login_manager.unauthorized_handler
+def handle_unauthorized():
+    return redirect(url_for("login", next=current_request_next_target()))
+
+
+@app.after_request
+def add_security_headers(response):
+    for header_name, header_value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header_name, header_value)
+
+    should_disable_caching = request.endpoint != "static" and (
+        request.endpoint in NO_STORE_ENDPOINTS or current_user.is_authenticated
+    )
+    if should_disable_caching:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+
+    return response
+
+
+@app.context_processor
+def inject_current_admin_label():
+    label = None
+    if current_user.is_authenticated:
+        label = current_user.full_name or current_user.email
+    return {"current_admin_label": label}
+
+
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    form_data = {"email": "", "remember_me": False}
+    next_url = get_safe_next_target(request.args.get("next"))
+
+    if request.method == "POST":
+        email = normalize_email(request.form.get("email"))
+        password = request.form.get("password") or ""
+        remember_me = request.form.get("remember_me") in {"on", "true", "1", "yes"}
+        next_url = get_safe_next_target(
+            request.form.get("next") or request.args.get("next")
+        )
+
+        form_data["email"] = email
+        form_data["remember_me"] = remember_me
+
+        if not email:
+            flash("Email is required.", "error")
+        if not password:
+            flash("Password is required.", "error")
+
+        if email and password:
+            admin_user = AdminUser.query.filter_by(email=email).first()
+            now = utc_now()
+
+            if admin_user and admin_user.is_locked(now):
+                flash("Invalid email or password.", "error")
+            elif admin_user and admin_user.is_active and admin_user.check_password(password):
+                admin_user.reset_login_state()
+                admin_user.last_login_at = now
+                db.session.commit()
+
+                session.clear()
+                login_user(admin_user, remember=remember_me)
+                return redirect(next_url or url_for("index"))
+            else:
+                if admin_user:
+                    admin_user.register_failed_login(now)
+                    db.session.commit()
+                flash("Invalid email or password.", "error")
+
+    return render_template("login.html", form_data=form_data, next_url=next_url)
+
+
 @app.route("/orders")
+@login_required
 def orders():
     return render_template("manageOrders.html")
 
 
 @app.route("/tasks")
+@login_required
 def tasks():
     return render_template("tasks.html")
 
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    session.clear()
+    logout_user()
+    return redirect(url_for("login"))
+
+
 @app.cli.command("init-db")
 def init_db_command():
-    db.create_all()
+    db.create_all(bind_key="__all__")
     print("Database initialized.")
 
 
+@app.cli.command("create-admin")
+@click.option("--email", required=True, help="Admin email address.")
+@click.option("--full-name", default=None, help="Optional admin display name.")
+@click.option(
+    "--update",
+    is_flag=True,
+    help="Update an existing admin user instead of failing if the email already exists.",
+)
+def create_admin_command(email, full_name, update):
+    normalized_email = normalize_email(email)
+    if not normalized_email:
+        raise click.ClickException("A valid email address is required.")
+
+    password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
+    if not password:
+        raise click.ClickException("Password cannot be empty.")
+
+    db.create_all(bind_key=[AUTH_BIND_KEY])
+    admin_user = AdminUser.query.filter_by(email=normalized_email).first()
+
+    if admin_user and not update:
+        raise click.ClickException(
+            "Admin user already exists. Re-run with --update to replace the password."
+        )
+
+    if admin_user is None:
+        admin_user = AdminUser(email=normalized_email)
+        db.session.add(admin_user)
+        action = "created"
+    else:
+        action = "updated"
+
+    if full_name is not None:
+        admin_user.full_name = full_name.strip() or None
+
+    admin_user.is_active = True
+    admin_user.reset_login_state()
+    admin_user.set_password(password)
+    db.session.commit()
+
+    click.echo(f"Admin user {action}: {normalized_email}")
+
+
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    app.run(host="localhost", port=8000, debug=True)
+    app.run(host="localhost", port=8000, debug=env_flag("FLASK_DEBUG", default=False))
