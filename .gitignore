@@ -11,7 +11,7 @@ htmlcov/
 .ruff_cache/
 
 # Virtual environments
-.venv/
+.venv*
 venv/
 env/
 ENV/
