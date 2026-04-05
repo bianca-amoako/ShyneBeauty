@@ -37,7 +37,7 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "SAMEORIGIN",
 }
-NO_STORE_ENDPOINTS = {"index", "login", "logout", "orders", "tasks"}
+NO_STORE_ENDPOINTS = {"index", "login", "logout", "orders", "tasks", "customers"}
 
 
 def require_env(name):
@@ -550,6 +550,12 @@ def orders():
 @login_required
 def tasks():
     return render_template("tasks.html")
+
+
+@app.route("/customers")
+@login_required
+def customers():
+    return render_template("customerDatabase.html")
 
 
 @app.route("/logout", methods=["POST"])

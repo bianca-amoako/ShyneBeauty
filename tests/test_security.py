@@ -6,7 +6,7 @@ from sqlalchemy import select
 from shyne import AdminUser, db
 
 
-@pytest.mark.parametrize("route", ["/", "/orders", "/tasks", "/admin/"])
+@pytest.mark.parametrize("route", ["/", "/orders", "/tasks", "/customers", "/admin/"])
 def test_anonymous_access_to_protected_routes_redirects_to_login(client, route):
     response = client.get(route)
 
@@ -222,6 +222,7 @@ def test_expired_lockout_allows_login_again(client, admin_user, app, login):
         ("/", b"Home Dashboard / Analytics"),
         ("/orders", b"Manage Orders"),
         ("/tasks", b"Task List"),
+        ("/customers", b"Customer Database"),
         ("/admin/", b"ShyneBeauty Admin"),
     ],
 )

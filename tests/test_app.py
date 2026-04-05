@@ -92,6 +92,7 @@ def test_index_route_links_to_orders_page(client, admin_user, login):
 
     assert response.status_code == 200
     assert b'href="/orders"' in response.data
+    assert b'href="/customers"' in response.data
     assert b"Manage Orders" in response.data
 
 
@@ -118,6 +119,7 @@ def test_routes_are_registered(app):
     assert "/" in routes
     assert "/login" in routes
     assert "/orders" in routes
+    assert "/customers" in routes
     assert "/tasks" in routes
     assert "/logout" in routes
 
