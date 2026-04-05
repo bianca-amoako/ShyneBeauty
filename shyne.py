@@ -121,10 +121,12 @@ def is_safe_next_target(target):
         return False
 
     candidate = target.strip()
-    if not candidate.startswith("/") or candidate.startswith("//") or candidate.startswith("/\\"):
+    normalized_candidate = candidate.replace("\\", "/")
+
+    if not candidate.startswith("/") or normalized_candidate.startswith("//"):
         return False
 
-    parts = urlsplit(candidate)
+    parts = urlsplit(normalized_candidate)
     return not parts.scheme and not parts.netloc
 
 
@@ -533,7 +535,21 @@ def login():
 
                 session.clear()
                 login_user(admin_user, remember=remember_me)
-                return redirect(next_url or url_for("index"))
+                submitted_next = request.form.get("next") or request.args.get("next") or ""
+                candidate_next = submitted_next.strip()
+                normalized_candidate_next = candidate_next.replace("\\", "/")
+                parsed_candidate_next = urlsplit(normalized_candidate_next)
+
+                if (
+                    candidate_next
+                    and candidate_next.startswith("/")
+                    and not normalized_candidate_next.startswith("//")
+                    and not parsed_candidate_next.scheme
+                    and not parsed_candidate_next.netloc
+                ):
+                    return redirect(candidate_next)
+
+                return redirect(url_for("index"))
             else:
                 if admin_user:
                     admin_user.register_failed_login(now)
