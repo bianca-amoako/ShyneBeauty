@@ -15,6 +15,7 @@ from shyne import (
     Order,
     OrderItem,
     OrderStatusEvent,
+    PASSWORD_HASH_METHOD,
     Product,
     ProductBatch,
     Shipment,
@@ -176,6 +177,7 @@ def test_create_admin_cli_command_creates_hashed_password(app):
     with app.app_context():
         user = AdminUser.query.filter_by(email="owner@shynebeauty.com").one()
         assert user.password_hash != password
+        assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
         assert user.check_password(password) is True
         assert "admin_users" not in set(inspect(db.engine).get_table_names())
         assert "admin_users" in set(inspect(db.engines["auth"]).get_table_names())
