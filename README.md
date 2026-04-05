@@ -50,6 +50,13 @@ Optional variables:
 - `FLASK_DEBUG=true` for debugging
 - `SESSION_COOKIE_SECURE=true` for HTTPS
 
+## Password Hashing
+
+- Admin passwords are created with Werkzeug PBKDF2 using
+  `pbkdf2:sha256:1000000`.
+- This hash method was chosen for cross-platform compatibility across macOS,
+  Windows, and Linux.
+
 ## Testing And CI
 
 Run the local test suite with one of these commands:

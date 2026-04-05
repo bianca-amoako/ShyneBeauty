@@ -32,6 +32,7 @@ FAILED_LOGIN_THRESHOLD = 5
 ACCOUNT_LOCK_DURATION = timedelta(minutes=15)
 BASE_DIR = Path(__file__).resolve().parent
 AUTH_BIND_KEY = "auth"
+PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000000"
 SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
@@ -165,7 +166,9 @@ class AdminUser(UserMixin, db.Model):
     def set_password(self, password):
         if not password:
             raise ValueError("Password is required.")
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(
+            password, method=PASSWORD_HASH_METHOD
+        )
 
     def check_password(self, password):
         if not self.password_hash:
