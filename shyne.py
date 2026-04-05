@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlparse
 
 import click
 from dotenv import dotenv_values
@@ -126,7 +126,7 @@ def is_safe_next_target(target):
     if not candidate.startswith("/") or normalized_candidate.startswith("//"):
         return False
 
-    parts = urlsplit(normalized_candidate)
+    parts = urlparse(normalized_candidate)
     return not parts.scheme and not parts.netloc
 
 
@@ -535,19 +535,19 @@ def login():
 
                 session.clear()
                 login_user(admin_user, remember=remember_me)
-                submitted_next = request.form.get("next") or request.args.get("next") or ""
-                candidate_next = submitted_next.strip()
-                normalized_candidate_next = candidate_next.replace("\\", "/")
-                parsed_candidate_next = urlsplit(normalized_candidate_next)
+                next_target = request.form.get("next") or request.args.get("next") or ""
+                next_target = next_target.strip()
+                normalized_next_target = next_target.replace("\\", "/")
+                parsed_next_target = urlparse(normalized_next_target)
 
                 if (
-                    candidate_next
-                    and candidate_next.startswith("/")
-                    and not normalized_candidate_next.startswith("//")
-                    and not parsed_candidate_next.scheme
-                    and not parsed_candidate_next.netloc
+                    next_target
+                    and next_target.startswith("/")
+                    and not normalized_next_target.startswith("//")
+                    and not parsed_next_target.scheme
+                    and not parsed_next_target.netloc
                 ):
-                    return redirect(candidate_next)
+                    return redirect(normalized_next_target)
 
                 return redirect(url_for("index"))
             else:
