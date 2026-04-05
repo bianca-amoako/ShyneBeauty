@@ -128,6 +128,29 @@ def test_open_redirect_attempts_are_ignored(client, admin_user, login):
     assert response.headers["Location"].endswith("/")
 
 
+@pytest.mark.parametrize(
+    "next_url",
+    [
+        "//evil.example/phish",
+        "/\\evil.example/phish",
+        "https:/evil.example/phish",
+        "https:///evil.example/phish",
+    ],
+)
+def test_malformed_next_targets_are_ignored(client, admin_user, login, next_url):
+    response = login(client, next_url=next_url)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+
+def test_internal_next_targets_with_query_params_are_allowed(client, admin_user, login):
+    response = login(client, next_url="/orders?status=open")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders?status=open")
+
+
 def test_authenticated_users_are_redirected_away_from_login(
     client, admin_user, login
 ):
