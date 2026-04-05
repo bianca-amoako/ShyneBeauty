@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ShyneBeauty Dashboard</title>
+  <title>Customer Database</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
@@ -63,31 +63,6 @@
       overflow-x: auto;
     }
 
-    .sb-card {
-      background-color: #ffffff;
-      border-left: 6px solid #b9ddd8;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    .sb-card-accent {
-      background-color: #d8ece8;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    .sb-card-warm {
-      background-color: #efe3d3;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    .sb-card-alert {
-      background-color: #f3d7c8;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
     .sb-panel {
       background-color: #ffffff;
       color: #4f4a45;
@@ -109,6 +84,28 @@
       color: #4c4a46;
     }
 
+    .sb-button {
+      background-color: #bfe3df;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button:hover {
+      background-color: #a9d6d0 !important;
+      color: #3f3b37 !important;
+    }
+
+    .sb-button-warm {
+      background-color: #e8d5bd;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button-warm:hover {
+      background-color: #dcc3a5 !important;
+      color: #3f3b37 !important;
+    }
+
     .sb-tag-aqua {
       background-color: #bfe3df;
       color: #3f3b37;
@@ -122,31 +119,6 @@
     .sb-tag-soft {
       background-color: #f0e7dc;
       color: #4c4a46;
-    }
-
-    .sb-progress-bg {
-      background-color: #ece7de;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .sb-progress-aqua {
-      background-color: #bfe3df;
-      color: #3f3b37;
-    }
-
-    .sb-progress-warm {
-      background-color: #e8d5bd;
-      color: #4c4a46;
-    }
-
-    .sb-progress-soft {
-      background-color: #d8ece8;
-      color: #4c4a46;
-    }
-
-    .sb-logo-title {
-      letter-spacing: 1px;
     }
 
     .sb-logout-form {
@@ -167,13 +139,14 @@
     }
   </style>
 </head>
+
 <body class="w3-light-grey">
 
 <div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
   <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
     <i class="fa fa-bars"></i> Menu
   </button>
-  <span class="w3-bar-item w3-right sb-logo-title">SHYNE BEAUTY</span>
+  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
 </div>
 
 <nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
@@ -204,11 +177,11 @@
       <i class="fa fa-remove fa-fw"></i> Close Menu
     </a>
 
-    <a href="index.html" class="w3-bar-item w3-button w3-padding sb-active">
+    <a href="index.html" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
     </a>
 
-    <a href="manageOrders.html" class="w3-bar-item w3-button w3-padding">
+    <a href="manageOrders.html" class="w3-bar-item w3-button w3-padding sb-active">
       <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
     </a>
 
@@ -216,14 +189,14 @@
       <i class="fa fa-cubes fa-fw"></i> Inventory
     </a>
 
-    <a href="customerDatabase.html" class="w3-bar-item w3-button w3-padding">
+    <a href="#" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-folder-open fa-fw"></i> Customers
     </a>
 
     <a href="#" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-line-chart fa-fw"></i> Reports
     </a>
-    
+
     <a href="tasks.html" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-tasks fa-fw"></i> Tasks
     </a>
@@ -236,137 +209,142 @@
 
 <div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
 
-<div class="w3-main" style="margin-left:300px;margin-top:43px;">
+<div class="w3-main" style="margin-left:300px;margin-top:43px">
 
   <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-dashboard"></i> Home Dashboard / Analytics</b></h3>
-    <p class="sb-subtle">Overview of orders, fulfillment progress, inventory alerts, and recent business activity.</p>
+    <h3 class="sb-heading"><b><i class="fa fa-shopping-bag"></i> Manage Orders</b></h3>
+    <p class="sb-subtle">Track customer orders from Fiverr, Square, Google Sheets, and manual entries.</p>
   </header>
 
-  <div class="w3-row-padding w3-margin-bottom">
-    <div class="w3-quarter">
-      <div class="w3-container sb-card-accent w3-padding-16 card-round">
-        <div class="w3-left"><i class="fa fa-shopping-cart w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>28</h3></div>
-        <div class="w3-clear"></div>
-        <h4>Active Orders</h4>
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <div class="w3-row-padding">
+      <div class="w3-third">
+        <label><b>Search Orders</b></label>
+        <input class="w3-input w3-border" type="text" placeholder="Search by order ID, customer, or product">
+      </div>
+
+      <div class="w3-third">
+        <label><b>Source</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Sources</option>
+          <option>Fiverr</option>
+          <option>Square</option>
+          <option>Google Sheets</option>
+          <option>Manual Entry</option>
+        </select>
+      </div>
+
+      <div class="w3-third">
+        <label><b>Status</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Statuses</option>
+          <option>New</option>
+          <option>In Progress</option>
+          <option>Waiting for Ingredients</option>
+          <option>Packed</option>
+          <option>Shipped</option>
+          <option>Completed</option>
+        </select>
       </div>
     </div>
 
-    <div class="w3-quarter">
-      <div class="w3-container sb-card w3-padding-16 card-round">
-        <div class="w3-left"><i class="fa fa-truck w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>9</h3></div>
-        <div class="w3-clear"></div>
-        <h4>Ready to Ship</h4>
-      </div>
-    </div>
-
-    <div class="w3-quarter">
-      <div class="w3-container sb-card-warm w3-padding-16 card-round">
-        <div class="w3-left"><i class="fa fa-check-circle w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>14</h3></div>
-        <div class="w3-clear"></div>
-        <h4>Completed</h4>
-      </div>
-    </div>
-
-    <div class="w3-quarter">
-      <div class="w3-container sb-card-alert w3-padding-16 card-round">
-        <div class="w3-left"><i class="fa fa-exclamation-triangle w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>4</h3></div>
-        <div class="w3-clear"></div>
-        <h4>Low Stock Alerts</h4>
-      </div>
-    </div>
-  </div>
-
-  <div class="w3-row-padding">
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding section-space card-round">
-        <h5 class="sb-heading">Orders by Source</h5>
-        <table class="w3-table w3-striped">
-          <tr>
-            <th>Source</th>
-            <th>Orders</th>
-            <th>Status</th>
-          </tr>
-          <tr>
-            <td>Fiverr</td>
-            <td>11</td>
-            <td><span class="w3-tag sb-tag-aqua w3-round">Connected</span></td>
-          </tr>
-          <tr>
-            <td>Square</td>
-            <td>10</td>
-            <td><span class="w3-tag sb-tag-aqua w3-round">Connected</span></td>
-          </tr>
-          <tr>
-            <td>Google Sheets</td>
-            <td>7</td>
-            <td><span class="w3-tag sb-tag-soft w3-round">Manual Sync</span></td>
-          </tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding section-space card-round">
-        <h5 class="sb-heading">Fulfillment Progress</h5>
-
-        <p>Pending Production</p>
-        <div class="sb-progress-bg">
-          <div class="w3-container sb-progress-aqua w3-center w3-padding" style="width:35%">35%</div>
-        </div>
-
-        <p class="w3-margin-top">Packaging / Labeling</p>
-        <div class="sb-progress-bg">
-          <div class="w3-container sb-progress-warm w3-center w3-padding" style="width:25%">25%</div>
-        </div>
-
-        <p class="w3-margin-top">Shipped</p>
-        <div class="sb-progress-bg">
-          <div class="w3-container sb-progress-soft w3-center w3-padding" style="width:40%">40%</div>
-        </div>
-      </div>
+    <div class="w3-margin-top">
+      <button class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
+      <button class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</button>
+      <button class="w3-button sb-button-warm w3-right"><i class="fa fa-plus"></i> Add Order</button>
     </div>
   </div>
 
-  <div class="w3-container sb-panel w3-padding section-space card-round">
-    <h5 class="sb-heading">Recent Orders</h5>
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <h5 class="sb-heading">Order List</h5>
+
     <div class="table-scroll">
-      <table class="w3-table w3-striped w3-bordered sb-table">
+      <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
         <tr>
           <th>Order ID</th>
           <th>Customer</th>
           <th>Source</th>
-          <th>Product</th>
+          <th>Products</th>
           <th>Status</th>
+          <th>Order Date</th>
+          <th>Ship Date</th>
           <th>Total</th>
+          <th>Actions</th>
         </tr>
+
         <tr>
           <td>SB-1001</td>
-          <td>Jasmine Lee</td>
+          <td>Anita Njiwah</td>
           <td>Fiverr</td>
-          <td>Custom Body Butter</td>
+          <td>Cleanser, Body Scrub</td>
           <td><span class="w3-tag sb-tag-beige">In Progress</span></td>
+          <td>03/20/2026</td>
+          <td>03/24/2026</td>
           <td>$42.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
         </tr>
+
         <tr>
           <td>SB-1002</td>
-          <td>Tanya Moore</td>
+          <td>Brandon Umami</td>
           <td>Square</td>
-          <td>Sugar Scrub Set</td>
+          <td>Body Butter, Lip Scrub</td>
           <td><span class="w3-tag sb-tag-aqua">Packed</span></td>
-          <td>$28.00</td>
+          <td>03/19/2026</td>
+          <td>03/23/2026</td>
+          <td>$36.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
         </tr>
+
         <tr>
           <td>SB-1003</td>
-          <td>Naomi Reed</td>
+          <td>Jasmine Lee</td>
           <td>Google Sheets</td>
           <td>Whipped Soap</td>
           <td><span class="w3-tag sb-tag-aqua">Shipped</span></td>
+          <td>03/18/2026</td>
+          <td>03/21/2026</td>
           <td>$19.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>SB-1004</td>
+          <td>Naomi Reed</td>
+          <td>Manual Entry</td>
+          <td>Body Oil, Sugar Scrub</td>
+          <td><span class="w3-tag sb-tag-soft">Waiting for Ingredients</span></td>
+          <td>03/17/2026</td>
+          <td>03/25/2026</td>
+          <td>$31.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>SB-1005</td>
+          <td>Tanya Moore</td>
+          <td>Fiverr</td>
+          <td>Sugar Scrub Set</td>
+          <td><span class="w3-tag sb-tag-beige">New</span></td>
+          <td>03/22/2026</td>
+          <td>Pending</td>
+          <td>$27.00</td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
         </tr>
       </table>
     </div>
@@ -375,25 +353,27 @@
   <div class="w3-row-padding w3-margin-top w3-margin-bottom">
     <div class="w3-half">
       <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Inventory Alerts</h5>
+        <h5 class="sb-heading">Order Status Workflow</h5>
         <ul class="w3-ul">
-          <li>Shea butter is below reorder threshold.</li>
-          <li>Vitamin E stock is low.</li>
-          <li>Body butter jars need restocking.</li>
-          <li>Label sheets are almost out.</li>
+          <li>New</li>
+          <li>In Progress</li>
+          <li>Waiting for Ingredients</li>
+          <li>Packed</li>
+          <li>Shipped</li>
+          <li>Completed</li>
         </ul>
       </div>
     </div>
 
     <div class="w3-half">
       <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Recent Activity</h5>
-        <ul class="w3-ul">
-          <li>Order SB-1002 was marked as packed.</li>
-          <li>New Fiverr order was added this morning.</li>
-          <li>Square payment was received for SB-1004.</li>
-          <li>Formula notes were updated in Google Drive.</li>
-        </ul>
+        <h5 class="sb-heading">Page Purpose</h5>
+        <p>
+          This page is meant to give the stakeholder one central place to view and manage orders instead of switching between Fiverr, Square, Google Sheets, and Google Drive.
+        </p>
+        <p>
+          In the full version, the table will be connected to the Flask backend and database instead of using sample data.
+        </p>
       </div>
     </div>
   </div>
