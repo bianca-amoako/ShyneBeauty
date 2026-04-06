@@ -271,81 +271,20 @@
           <th>Total</th>
           <th>Actions</th>
         </tr>
-
+        
+        <!-- Here is where the orders from the DB should be populated. -->
+        {% for order in all_orders %}
         <tr>
-          <td>SB-1001</td>
-          <td>Anita Njiwah</td>
-          <td>Fiverr</td>
-          <td>Cleanser, Body Scrub</td>
-          <td><span class="w3-tag sb-tag-beige">In Progress</span></td>
-          <td>03/20/2026</td>
-          <td>03/24/2026</td>
-          <td>$42.00</td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
+            <td>{{ order.id }}</td>
+            <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+            <td>{{ order.source_platform }}</td>
+            <td>{% for item in order.order_items %} {{item.product.name}}, {% endfor %}</td>
+            <td>{{ order.status }}</td>
+            <td>{{ order.placed_at }}</td>
+            <td>{{order.shipment.shipped_at}}</td>
+            <td>${{ "%.2f"|format(order.total_amount) }}</td>
         </tr>
-
-        <tr>
-          <td>SB-1002</td>
-          <td>Brandon Umami</td>
-          <td>Square</td>
-          <td>Body Butter, Lip Scrub</td>
-          <td><span class="w3-tag sb-tag-aqua">Packed</span></td>
-          <td>03/19/2026</td>
-          <td>03/23/2026</td>
-          <td>$36.00</td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>SB-1003</td>
-          <td>Jasmine Lee</td>
-          <td>Google Sheets</td>
-          <td>Whipped Soap</td>
-          <td><span class="w3-tag sb-tag-aqua">Shipped</span></td>
-          <td>03/18/2026</td>
-          <td>03/21/2026</td>
-          <td>$19.00</td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>SB-1004</td>
-          <td>Naomi Reed</td>
-          <td>Manual Entry</td>
-          <td>Body Oil, Sugar Scrub</td>
-          <td><span class="w3-tag sb-tag-soft">Waiting for Ingredients</span></td>
-          <td>03/17/2026</td>
-          <td>03/25/2026</td>
-          <td>$31.00</td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>SB-1005</td>
-          <td>Tanya Moore</td>
-          <td>Fiverr</td>
-          <td>Sugar Scrub Set</td>
-          <td><span class="w3-tag sb-tag-beige">New</span></td>
-          <td>03/22/2026</td>
-          <td>Pending</td>
-          <td>$27.00</td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
+    {% endfor %}
       </table>
     </div>
   </div>

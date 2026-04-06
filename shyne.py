@@ -165,7 +165,7 @@ class AdminUser(UserMixin, db.Model):
     def set_password(self, password):
         if not password:
             raise ValueError("Password is required.")
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method='pbkdf2')
 
     def check_password(self, password):
         if not self.password_hash:
@@ -543,7 +543,8 @@ def login():
 @app.route("/orders")
 @login_required
 def orders():
-    return render_template("manageOrders.html")
+    all_orders = db.session.query(Order).all()
+    return render_template("manageOrders.html",all_orders=all_orders)
 
 
 @app.route("/tasks")
