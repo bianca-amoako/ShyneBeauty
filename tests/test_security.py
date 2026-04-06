@@ -100,6 +100,13 @@ def test_invalid_credentials_show_generic_error(client, admin_user, email, passw
     assert b"Invalid email or password." in response.data
 
 
+def test_default_config_rejects_dev_test_admin_credentials(client):
+    response = client.post("/login", data={"email": "admin", "password": "admin"})
+
+    assert response.status_code == 200
+    assert b"Invalid email or password." in response.data
+
+
 def test_inactive_admin_cannot_log_in(client, app, login):
     with app.app_context():
         user = AdminUser(
@@ -237,6 +244,84 @@ def test_expired_lockout_allows_login_again(client, admin_user, app, login):
         ).one()
         assert row.failed_login_count == 0
         assert row.locked_until is None
+
+
+def test_seeded_dev_test_admin_can_log_in_and_access_protected_routes(client, app):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code == 0
+
+    response = client.post(
+        "/login",
+        data={"email": "admin", "password": "admin", "next": "/orders"},
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders")
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="admin").one()
+        user_id = user.id
+        assert user.last_login_at is not None
+
+    with client.session_transaction() as session_data:
+        assert session_data.get("_user_id") == str(user_id)
+
+    protected_response = client.get("/orders")
+    assert protected_response.status_code == 200
+    assert b"Manage Orders" in protected_response.data
+
+
+def test_seeded_dev_test_admin_is_rejected_when_dev_mode_is_disabled(client, app):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code == 0
+
+    app.config["ENABLE_DEV_TEST_ADMIN"] = False
+
+    response = client.post(
+        "/login",
+        data={"email": "admin", "password": "admin"},
+    )
+
+    assert response.status_code == 200
+    assert b"Invalid email or password." in response.data
+
+    with client.session_transaction() as session_data:
+        assert "_user_id" not in session_data
+
+
+def test_seeded_dev_test_admin_still_locks_after_repeated_failed_attempts(client, app):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code == 0
+
+    for _ in range(5):
+        response = client.post(
+            "/login",
+            data={"email": "admin", "password": "wrong-password"},
+        )
+        assert response.status_code == 200
+        assert b"Invalid email or password." in response.data
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="admin").one()
+        assert user.failed_login_count == 5
+        assert user.locked_until is not None
+
+    locked_response = client.post(
+        "/login",
+        data={"email": "admin", "password": "admin"},
+    )
+
+    assert locked_response.status_code == 200
+    assert b"Invalid email or password." in locked_response.data
 
 
 @pytest.mark.parametrize(
