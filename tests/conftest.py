@@ -38,22 +38,25 @@ def clear_test_data():
             for table in reversed(metadata.sorted_tables):
                 if table.name in existing_tables:
                     connection.execute(table.delete())
+    db.session.remove()
 
 
 @pytest.fixture()
 def app():
     flask_app.config.update(
         TESTING=True,
+        DEBUG=False,
         SECRET_KEY="test-secret-key",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        ENABLE_DEV_TEST_ADMIN=False,
     )
 
     with flask_app.app_context():
         db.create_all(bind_key="__all__")
         clear_test_data()
         yield flask_app
-        clear_test_data()
         db.session.remove()
+        clear_test_data()
 
 
 @pytest.fixture()

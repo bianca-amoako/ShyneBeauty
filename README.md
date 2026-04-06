@@ -28,8 +28,12 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 4. Initialize the databases with `flask --app shyne.py init-db`.
 5. Create an admin account with
    `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
-6. Start the dev server with `python shyne.py`.
-7. Open `http://localhost:8000/login` and sign in.
+6. Optional local-only shortcut: set `ENABLE_DEV_TEST_ADMIN=true` and run
+   `flask --app shyne.py --debug seed-dev-admin` to seed a development login of
+   `admin` / `admin`. The login page only shows the credentials after that
+   seeding step has run.
+7. Start the dev server with `python shyne.py`.
+8. Open `http://localhost:8000/login` and sign in.
 
 Example setup:
 
@@ -48,6 +52,7 @@ Optional variables:
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL`
 - `FLASK_DEBUG=true` for debugging
+- `ENABLE_DEV_TEST_ADMIN=true` for the local-only `seed-dev-admin` shortcut
 - `SESSION_COOKIE_SECURE=true` for HTTPS
 
 ## Password Hashing
