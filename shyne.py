@@ -624,6 +624,11 @@ def tasks():
 def customers():
     return render_template("customerDatabase.html")
 
+@app.route("/inventory")
+@login_required
+def inventory():
+    return render_template("inventory.html")
+
 
 @app.route("/logout", methods=["POST"])
 @login_required
