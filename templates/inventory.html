@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Inventory Page</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+  <style>
+    html, body, h1, h2, h3, h4, h5 {
+      font-family: "Raleway", sans-serif;
+    }
+
+    body {
+      background-color: #f6f3ee;
+      color: #4f4a45;
+    }
+
+    .sb-topbar {
+      background: linear-gradient(to right, #e7d8c3, #f3eadc);
+      color: #5f5a54;
+      border-bottom: 2px solid #d7c3aa;
+    }
+
+    .sb-topbar .w3-bar-item {
+      color: #5f5a54 !important;
+      font-weight: 600;
+    }
+
+    .sb-sidebar {
+      background-color: #fcfaf7;
+      color: #5f5a54;
+      border-right: 1px solid #eadfce;
+    }
+
+    .sb-sidebar .w3-bar-item {
+      color: #5f5a54;
+      font-weight: 500;
+    }
+
+    .sb-sidebar .w3-bar-item:hover {
+      background-color: #d7ece8 !important;
+      color: #4c4a46 !important;
+    }
+
+    .sb-active {
+      background-color: #bfe3df !important;
+      color: #4c4a46 !important;
+      font-weight: bold;
+    }
+
+    .card-round {
+      border-radius: 12px;
+    }
+
+    .section-space {
+      margin-top: 18px;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    .sb-panel {
+      background-color: #ffffff;
+      color: #4f4a45;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-radius: 12px;
+    }
+
+    .sb-heading {
+      color: #7c746c;
+      letter-spacing: 0.5px;
+    }
+
+    .sb-subtle {
+      color: #7a746d;
+    }
+
+    .sb-table th {
+      background-color: #bfe3df;
+      color: #4c4a46;
+    }
+
+    .sb-button {
+      background-color: #bfe3df;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button:hover {
+      background-color: #a9d6d0 !important;
+      color: #3f3b37 !important;
+    }
+
+    .sb-button-warm {
+      background-color: #e8d5bd;
+      color: #4c4a46;
+      border: none;
+    }
+
+    .sb-button-warm:hover {
+      background-color: #dcc3a5 !important;
+      color: #3f3b37 !important;
+    }
+
+    .sb-tag-aqua {
+      background-color: #bfe3df;
+      color: #3f3b37;
+    }
+
+    .sb-tag-beige {
+      background-color: #eadbc8;
+      color: #4c4a46;
+    }
+
+    .sb-tag-soft {
+      background-color: #f0e7dc;
+      color: #4c4a46;
+    }
+
+    .sb-tag-alert {
+      background-color: #f3d7c8;
+      color: #4c4a46;
+    }
+  </style>
+</head>
+
+<body class="w3-light-grey">
+
+<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
+  <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
+    <i class="fa fa-bars"></i> Menu
+  </button>
+  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
+</div>
+
+<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
+  <div class="w3-container w3-row">
+    <div class="w3-col s4">
+      <div class="w3-circle w3-margin-right" style="width:46px;height:46px;background:#d7ece8;"></div>
+    </div>
+    <div class="w3-col s8 w3-bar">
+      <span>Welcome, <strong>Brittany</strong></span><br>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
+      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
+    </div>
+  </div>
+  <hr>
+
+  <div class="w3-container">
+    <h5 class="sb-heading">Dashboard</h5>
+  </div>
+
+  <div class="w3-bar-block">
+    <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-hover-black" onclick="w3_close()">
+      <i class="fa fa-remove fa-fw"></i> Close Menu
+    </a>
+
+    <a href="/" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
+    </a>
+
+    <a href="/orders" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
+    </a>
+
+    <a href="/inventory" class="w3-bar-item w3-button w3-padding sb-active">
+      <i class="fa fa-cubes fa-fw"></i> Inventory
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-folder-open fa-fw"></i> Files
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-line-chart fa-fw"></i> Reports
+    </a>
+
+    <a href="#" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-cog fa-fw"></i> Settings
+    </a><br><br>
+  </div>
+</nav>
+
+<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
+
+<div class="w3-main" style="margin-left:300px;margin-top:43px">
+
+  <header class="w3-container" style="padding-top:22px">
+    <h3 class="sb-heading"><b><i class="fa fa-cubes"></i> Inventory Page</b></h3>
+    <p class="sb-subtle">Track ingredients, packaging supplies, stock levels, and reorder status.</p>
+  </header>
+
+  <div class="w3-row-padding w3-margin-bottom">
+    <div class="w3-third">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Inventory Summary</h5>
+        <p><b>Total Inventory Items:</b> 18</p>
+        <p><b>Low Stock Items:</b> 4</p>
+        <p><b>Out of Stock:</b> 1</p>
+      </div>
+    </div>
+
+    <div class="w3-third">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Most Used Materials</h5>
+        <ul class="w3-ul">
+          <li>Shea Butter</li>
+          <li>Vitamin E</li>
+          <li>Jars</li>
+          <li>Label Sheets</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="w3-third">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Quick Actions</h5>
+        <button class="w3-button sb-button w3-margin-bottom w3-block">Add Inventory Item</button>
+        <button class="w3-button sb-button-warm w3-block">Update Stock</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <div class="w3-row-padding">
+      <div class="w3-third">
+        <label><b>Search Inventory</b></label>
+        <input class="w3-input w3-border" type="text" placeholder="Search by item name">
+      </div>
+
+      <div class="w3-third">
+        <label><b>Category</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Categories</option>
+          <option>Ingredients</option>
+          <option>Packaging</option>
+          <option>Labels</option>
+          <option>Supplies</option>
+        </select>
+      </div>
+
+      <div class="w3-third">
+        <label><b>Stock Status</b></label>
+        <select class="w3-select w3-border">
+          <option value="">All Statuses</option>
+          <option>In Stock</option>
+          <option>Low Stock</option>
+          <option>Out of Stock</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="w3-margin-top">
+      <button class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
+      <button class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</button>
+    </div>
+  </div>
+
+  <div class="w3-container sb-panel w3-padding card-round section-space">
+    <h5 class="sb-heading">Inventory List</h5>
+
+    <div class="table-scroll">
+      <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
+        <tr>
+          <th>Item Name</th>
+          <th>Category</th>
+          <th>Current Stock</th>
+          <th>Unit</th>
+          <th>Reorder Level</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+
+        <tr>
+          <td>Shea Butter</td>
+          <td>Ingredient</td>
+          <td>12</td>
+          <td>lbs</td>
+          <td>10</td>
+          <td><span class="w3-tag sb-tag-aqua">In Stock</span></td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>Vitamin E</td>
+          <td>Ingredient</td>
+          <td>3</td>
+          <td>bottles</td>
+          <td>5</td>
+          <td><span class="w3-tag sb-tag-beige">Low Stock</span></td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>Body Butter Jars</td>
+          <td>Packaging</td>
+          <td>8</td>
+          <td>boxes</td>
+          <td>6</td>
+          <td><span class="w3-tag sb-tag-aqua">In Stock</span></td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>Label Sheets</td>
+          <td>Labels</td>
+          <td>2</td>
+          <td>packs</td>
+          <td>4</td>
+          <td><span class="w3-tag sb-tag-beige">Low Stock</span></td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+
+        <tr>
+          <td>Rose Fragrance Oil</td>
+          <td>Ingredient</td>
+          <td>0</td>
+          <td>bottles</td>
+          <td>2</td>
+          <td><span class="w3-tag sb-tag-alert">Out of Stock</span></td>
+          <td>
+            <button class="w3-button w3-small sb-button">View</button>
+            <button class="w3-button w3-small sb-button-warm">Edit</button>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="w3-row-padding w3-margin-top w3-margin-bottom">
+    <div class="w3-half">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Low Stock Alerts</h5>
+        <ul class="w3-ul">
+          <li>Vitamin E is below reorder level.</li>
+          <li>Label Sheets need reordered soon.</li>
+          <li>Rose Fragrance Oil is out of stock.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="w3-half">
+      <div class="w3-container sb-panel w3-padding card-round">
+        <h5 class="sb-heading">Page Purpose</h5>
+        <p>
+          This page is meant to help the stakeholder keep track of materials and supplies used
+        </p>
+        <p>
+          In full version this page could be connected to the Flask backend and database so inventory updates
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var mySidebar = document.getElementById("mySidebar");
+  var overlayBg = document.getElementById("myOverlay");
+
+  function w3_open() {
+    if (mySidebar.style.display === "block") {
+      mySidebar.style.display = "none";
+      overlayBg.style.display = "none";
+    } else {
+      mySidebar.style.display = "block";
+      overlayBg.style.display = "block";
+    }
+  }
+
+  function w3_close() {
+    mySidebar.style.display = "none";
+    overlayBg.style.display = "none";
+  }
+</script>
+
+</body>
+</html>
