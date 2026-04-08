@@ -247,7 +247,7 @@
     <div class="w3-quarter">
       <div class="w3-container sb-card-accent w3-padding-16 card-round">
         <div class="w3-left"><i class="fa fa-shopping-cart w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>28</h3></div>
+        <div class="w3-right"><h3>{{ total_orders }}</h3></div>
         <div class="w3-clear"></div>
         <h4>Active Orders</h4>
       </div>
@@ -256,7 +256,7 @@
     <div class="w3-quarter">
       <div class="w3-container sb-card w3-padding-16 card-round">
         <div class="w3-left"><i class="fa fa-truck w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>9</h3></div>
+        <div class="w3-right"><h3>{{ ready_to_ship_count }}</h3></div>
         <div class="w3-clear"></div>
         <h4>Ready to Ship</h4>
       </div>
@@ -265,7 +265,7 @@
     <div class="w3-quarter">
       <div class="w3-container sb-card-warm w3-padding-16 card-round">
         <div class="w3-left"><i class="fa fa-check-circle w3-xxxlarge"></i></div>
-        <div class="w3-right"><h3>14</h3></div>
+        <div class="w3-right"><h3>{{completed_orders}}</h3></div>
         <div class="w3-clear"></div>
         <h4>Completed</h4>
       </div>
@@ -293,17 +293,17 @@
           </tr>
           <tr>
             <td>Fiverr</td>
-            <td>11</td>
+            <td>{{fiverr_orders}}</td>
             <td><span class="w3-tag sb-tag-aqua w3-round">Connected</span></td>
           </tr>
           <tr>
             <td>Square</td>
-            <td>10</td>
+            <td>{{square_orders}}</td>
             <td><span class="w3-tag sb-tag-aqua w3-round">Connected</span></td>
           </tr>
           <tr>
             <td>Google Sheets</td>
-            <td>7</td>
+            <td>{{google_orders}}</td>
             <td><span class="w3-tag sb-tag-soft w3-round">Manual Sync</span></td>
           </tr>
         </table>
@@ -344,30 +344,19 @@
           <th>Status</th>
           <th>Total</th>
         </tr>
+        {% for order in recent_orders %}
         <tr>
-          <td>SB-1001</td>
-          <td>Jasmine Lee</td>
-          <td>Fiverr</td>
-          <td>Custom Body Butter</td>
-          <td><span class="w3-tag sb-tag-beige">In Progress</span></td>
-          <td>$42.00</td>
+            <td>{{ order.id }}</td>
+            <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+            <td>{{ order.source_platform }}</td>
+            <td>{% for item in order.order_items %} {{item.product.name}}, {% endfor %}</td>
+            <td>{{ order.status }}</td>
+            <td>{{ order.placed_at }}</td>
+            <td>{{order.shipment.shipped_at}}</td>
+            <td>${{ "%.2f"|format(order.total_amount) }}</td>
         </tr>
-        <tr>
-          <td>SB-1002</td>
-          <td>Tanya Moore</td>
-          <td>Square</td>
-          <td>Sugar Scrub Set</td>
-          <td><span class="w3-tag sb-tag-aqua">Packed</span></td>
-          <td>$28.00</td>
-        </tr>
-        <tr>
-          <td>SB-1003</td>
-          <td>Naomi Reed</td>
-          <td>Google Sheets</td>
-          <td>Whipped Soap</td>
-          <td><span class="w3-tag sb-tag-aqua">Shipped</span></td>
-          <td>$19.00</td>
-        </tr>
+        {% endfor %}
+
       </table>
     </div>
   </div>
