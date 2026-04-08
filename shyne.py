@@ -26,6 +26,7 @@ from flask_login import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
+from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
 FAILED_LOGIN_THRESHOLD = 5
@@ -490,7 +491,14 @@ def inject_current_admin_label():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    total_orders = db.session.query(Order).count()
+    ready_to_ship_count = db.session.query(Order).filter(Order.status == 'Ready').count()
+    completed_orders = db.session.query(Order).filter(Order.status == "Completed").count()
+    fiverr_orders = db.session.query(Order).filter(Order.platform == "Fiverr").count()
+    square_orders = db.session.query(Order).filter(Order.platform == "Square").count()
+    google_orders = db.session.query(Order).filter(Order.platform == "Sheets").count()
+    recent_orders = Order.query.order_by(Order.placed_at.desc()).limit(3).all()
+    return render_template("index.html", total_orders=total_orders, ready_to_ship_count=ready_to_ship_count, fiverr_orders=fiverr_orders, square_orders=square_orders, google_orders=google_orders, recent_orders=recent_orders, completed_orders=completed_orders)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -543,8 +551,38 @@ def login():
 @app.route("/orders")
 @login_required
 def orders():
-    all_orders = db.session.query(Order).all()
-    return render_template("manageOrders.html",all_orders=all_orders)
+    search_query = request.args.get('search', '').strip()
+    source = request.args.get('source', '')
+    status = request.args.get('status', '')
+
+    query = Order.query
+    
+    if search_query:
+        query = query.filter(
+            or_(
+                Order.order_number.ilike(f'%{search_query}%'),
+                Order.customer.has(Customer.first_name.ilike(f'%{search_query}%')),
+                Order.customer.has(Customer.last_name.ilike(f'%{search_query}%'))
+            )
+        )
+    
+    if source:
+        query = query.filter(Order.platform == source)
+    
+    if status:
+        query = query.filter(Order.status == status)
+    
+    all_orders = query.options(
+        db.joinedload(Order.customer),
+        db.joinedload(Order.order_items).joinedload(OrderItem.product),
+        db.joinedload(Order.shipment)
+    ).order_by(Order.placed_at.desc()).all()
+    
+    return render_template("manageOrders.html", 
+                         all_orders=all_orders,
+                         search_query=search_query,
+                         selected_source=source,
+                         selected_status=status)
 
 
 @app.route("/tasks")
