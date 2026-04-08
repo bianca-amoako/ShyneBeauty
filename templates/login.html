@@ -278,6 +278,19 @@
         {% endif %}
       {% endwith %}
 
+      {% if show_dev_test_admin_hint %}
+        <p class="sb-helper">
+          {% if dev_test_admin_seeded %}
+            <strong>Local development shortcut:</strong> use <code>admin</code> in
+            the email field and <code>admin</code> as the password.
+          {% else %}
+            <strong>Local development setup:</strong> run
+            <code>flask --app shyne.py --debug seed-dev-admin</code> once, then
+            sign in with <code>admin</code> / <code>admin</code>.
+          {% endif %}
+        </p>
+      {% endif %}
+
       <form method="post" action="{{ url_for('login') }}" novalidate>
         <input type="hidden" name="next" value="{{ next_url }}">
 

@@ -15,6 +15,7 @@ from shyne import (
     Order,
     OrderItem,
     OrderStatusEvent,
+    PASSWORD_HASH_METHOD,
     Product,
     ProductBatch,
     Shipment,
@@ -83,6 +84,34 @@ def test_login_route_renders_expected_content(client):
     assert b"Admin dashboard access" in response.data
     assert b"Forgot password?" in response.data
     assert b"trusted internal admin workflow" in response.data
+    assert b"Local development shortcut" not in response.data
+
+
+def test_login_route_shows_dev_test_admin_hint_when_enabled(app, client):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    assert b"Local development setup" in response.data
+    assert b"seed-dev-admin" in response.data
+    assert b"sign in with <code>admin</code> / <code>admin</code>" in response.data
+
+
+def test_login_route_shows_dev_test_admin_credentials_after_seeding(app, client):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code == 0
+
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    assert b"Local development shortcut" in response.data
+    assert b"email field" in response.data
+    assert b"admin</code> as the password" in response.data
 
 
 def test_index_route_links_to_orders_page(client, admin_user, login):
@@ -92,6 +121,7 @@ def test_index_route_links_to_orders_page(client, admin_user, login):
 
     assert response.status_code == 200
     assert b'href="/orders"' in response.data
+    assert b'href="/customers"' in response.data
     assert b"Manage Orders" in response.data
 
 
@@ -118,6 +148,7 @@ def test_routes_are_registered(app):
     assert "/" in routes
     assert "/login" in routes
     assert "/orders" in routes
+    assert "/customers" in routes
     assert "/tasks" in routes
     assert "/logout" in routes
 
@@ -174,9 +205,79 @@ def test_create_admin_cli_command_creates_hashed_password(app):
     with app.app_context():
         user = AdminUser.query.filter_by(email="owner@shynebeauty.com").one()
         assert user.password_hash != password
+        assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
         assert user.check_password(password) is True
         assert "admin_users" not in set(inspect(db.engine).get_table_names())
         assert "admin_users" in set(inspect(db.engines["auth"]).get_table_names())
+
+
+def test_create_admin_cli_command_rejects_reserved_dev_admin_identifier(app):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(
+        args=["create-admin", "--email", "admin"],
+        input="admin\nadmin\n",
+    )
+
+    assert result.exit_code != 0
+    assert "reserved for the dev-only seed-dev-admin command" in result.output
+
+
+def test_seed_dev_admin_cli_command_requires_enable_flag(app):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code != 0
+    assert "ENABLE_DEV_TEST_ADMIN=true" in result.output
+
+
+def test_seed_dev_admin_cli_command_requires_debug_or_testing_mode(app):
+    app.config.update(
+        ENABLE_DEV_TEST_ADMIN=True,
+        TESTING=False,
+        DEBUG=False,
+    )
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["seed-dev-admin"])
+
+    assert result.exit_code != 0
+    assert "debug or testing mode" in result.output
+
+
+def test_seed_dev_admin_cli_command_upserts_dev_admin(app):
+    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+    runner = app.test_cli_runner()
+
+    first_result = runner.invoke(args=["seed-dev-admin"])
+
+    assert first_result.exit_code == 0
+    assert "Dev test admin created: admin" in first_result.output
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="admin").one()
+        user.full_name = None
+        user.is_active = False
+        user.failed_login_count = 5
+        user.locked_until = datetime.now(timezone.utc)
+        db.session.commit()
+
+    second_result = runner.invoke(args=["seed-dev-admin"])
+
+    assert second_result.exit_code == 0
+    assert "Dev test admin updated: admin" in second_result.output
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="admin").one()
+        assert user.full_name == "Dev Admin"
+        assert user.is_active is True
+        assert user.failed_login_count == 0
+        assert user.locked_until is None
+        assert user.password_hash != "admin"
+        assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
+        assert user.check_password("admin") is True
+        assert AdminUser.query.filter_by(email="admin").count() == 1
 
 
 def test_model_defaults_and_relationships_round_trip(app):

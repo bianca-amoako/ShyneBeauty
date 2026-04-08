@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlparse
 
 import click
 from dotenv import dotenv_values
@@ -33,12 +33,16 @@ FAILED_LOGIN_THRESHOLD = 5
 ACCOUNT_LOCK_DURATION = timedelta(minutes=15)
 BASE_DIR = Path(__file__).resolve().parent
 AUTH_BIND_KEY = "auth"
+PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000000"
+DEV_TEST_ADMIN_EMAIL = "admin"
+DEV_TEST_ADMIN_PASSWORD = "admin"
+DEV_TEST_ADMIN_FULL_NAME = "Dev Admin"
 SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "SAMEORIGIN",
 }
-NO_STORE_ENDPOINTS = {"index", "login", "logout", "orders", "tasks"}
+NO_STORE_ENDPOINTS = {"index", "login", "logout", "orders", "tasks", "customers"}
 
 
 def require_env(name):
@@ -88,6 +92,7 @@ app.config["SQLALCHEMY_BINDS"] = {
     AUTH_BIND_KEY: os.getenv("AUTH_DATABASE_URL", "sqlite:///shynebeauty_auth.db")
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["ENABLE_DEV_TEST_ADMIN"] = env_flag("ENABLE_DEV_TEST_ADMIN", default=False)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = env_flag("SESSION_COOKIE_SECURE", default=False)
@@ -121,10 +126,12 @@ def is_safe_next_target(target):
         return False
 
     candidate = target.strip()
-    if not candidate.startswith("/") or candidate.startswith("//") or candidate.startswith("/\\"):
+    normalized_candidate = candidate.replace("\\", "/")
+
+    if not candidate.startswith("/") or normalized_candidate.startswith("//"):
         return False
 
-    parts = urlsplit(candidate)
+    parts = urlparse(normalized_candidate)
     return not parts.scheme and not parts.netloc
 
 
@@ -138,6 +145,42 @@ def current_request_next_target():
     if request.query_string:
         return f"{request.path}?{request.query_string.decode('utf-8')}"
     return request.path
+
+
+def dev_test_admin_enabled(flask_app=None):
+    target_app = flask_app or app
+    return bool(target_app.config.get("ENABLE_DEV_TEST_ADMIN")) and (
+        target_app.testing or target_app.debug
+    )
+
+
+def is_dev_test_admin_email(email):
+    return normalize_email(email) == DEV_TEST_ADMIN_EMAIL
+
+
+def is_dev_test_admin_account(admin_user):
+    return admin_user is not None and is_dev_test_admin_email(admin_user.email)
+
+
+def dev_test_admin_seeded():
+    if not dev_test_admin_enabled():
+        return False
+    return (
+        db.session.query(AdminUser.id)
+        .filter_by(email=DEV_TEST_ADMIN_EMAIL)
+        .first()
+        is not None
+    )
+
+
+def require_dev_test_admin_mode(flask_app=None):
+    if dev_test_admin_enabled(flask_app):
+        return
+
+    raise click.ClickException(
+        "seed-dev-admin is only available when ENABLE_DEV_TEST_ADMIN=true "
+        "and the app is running in debug or testing mode."
+    )
 
 
 class AdminUser(UserMixin, db.Model):
@@ -166,7 +209,9 @@ class AdminUser(UserMixin, db.Model):
     def set_password(self, password):
         if not password:
             raise ValueError("Password is required.")
-        self.password_hash = generate_password_hash(password, method='pbkdf2')
+        self.password_hash = generate_password_hash(
+            password, method=PASSWORD_HASH_METHOD
+        )
 
     def check_password(self, password):
         if not self.password_hash:
@@ -529,7 +574,9 @@ def login():
             admin_user = AdminUser.query.filter_by(email=email).first()
             now = utc_now()
 
-            if admin_user and admin_user.is_locked(now):
+            if admin_user and is_dev_test_admin_account(admin_user) and not dev_test_admin_enabled():
+                flash("Invalid email or password.", "error")
+            elif admin_user and admin_user.is_locked(now):
                 flash("Invalid email or password.", "error")
             elif admin_user and admin_user.is_active and admin_user.check_password(password):
                 admin_user.reset_login_state()
@@ -538,14 +585,34 @@ def login():
 
                 session.clear()
                 login_user(admin_user, remember=remember_me)
-                return redirect(next_url or url_for("index"))
+                next_target = request.form.get("next") or request.args.get("next") or ""
+                next_target = next_target.strip()
+                normalized_next_target = next_target.replace("\\", "/")
+                parsed_next_target = urlparse(normalized_next_target)
+
+                if (
+                    next_target
+                    and next_target.startswith("/")
+                    and not normalized_next_target.startswith("//")
+                    and not parsed_next_target.scheme
+                    and not parsed_next_target.netloc
+                ):
+                    return redirect(normalized_next_target)
+
+                return redirect(url_for("index"))
             else:
                 if admin_user:
                     admin_user.register_failed_login(now)
                     db.session.commit()
                 flash("Invalid email or password.", "error")
 
-    return render_template("login.html", form_data=form_data, next_url=next_url)
+    return render_template(
+        "login.html",
+        form_data=form_data,
+        next_url=next_url,
+        show_dev_test_admin_hint=dev_test_admin_enabled(),
+        dev_test_admin_seeded=dev_test_admin_seeded(),
+    )
 
 
 @app.route("/orders")
@@ -591,6 +658,17 @@ def tasks():
     return render_template("tasks.html")
 
 
+@app.route("/customers")
+@login_required
+def customers():
+    return render_template("customerDatabase.html")
+
+@app.route("/inventory")
+@login_required
+def inventory():
+    return render_template("inventory.html")
+
+
 @app.route("/logout", methods=["POST"])
 @login_required
 def logout():
@@ -617,6 +695,10 @@ def create_admin_command(email, full_name, update):
     normalized_email = normalize_email(email)
     if not normalized_email:
         raise click.ClickException("A valid email address is required.")
+    if is_dev_test_admin_email(normalized_email):
+        raise click.ClickException(
+            "The 'admin' identifier is reserved for the dev-only seed-dev-admin command."
+        )
 
     password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
     if not password:
@@ -646,6 +728,29 @@ def create_admin_command(email, full_name, update):
     db.session.commit()
 
     click.echo(f"Admin user {action}: {normalized_email}")
+
+
+@app.cli.command("seed-dev-admin")
+def seed_dev_admin_command():
+    require_dev_test_admin_mode()
+
+    db.create_all(bind_key=[AUTH_BIND_KEY])
+    admin_user = AdminUser.query.filter_by(email=DEV_TEST_ADMIN_EMAIL).first()
+
+    if admin_user is None:
+        admin_user = AdminUser(email=DEV_TEST_ADMIN_EMAIL)
+        db.session.add(admin_user)
+        action = "created"
+    else:
+        action = "updated"
+
+    admin_user.full_name = DEV_TEST_ADMIN_FULL_NAME
+    admin_user.is_active = True
+    admin_user.reset_login_state()
+    admin_user.set_password(DEV_TEST_ADMIN_PASSWORD)
+    db.session.commit()
+
+    click.echo(f"Dev test admin {action}: {DEV_TEST_ADMIN_EMAIL}")
 
 
 if __name__ == "__main__":
