@@ -661,7 +661,26 @@ def tasks():
 @app.route("/customers")
 @login_required
 def customers():
-    return render_template("customerDatabase.html")
+    search_query = request.args.get('search', '').strip()
+    source = request.args.get('source', '')
+    
+    query = Customer.query
+    if search_query:
+        query = query.filter(
+            (Customer.first_name.ilike(f'%{search_query}%')) |
+            (Customer.last_name.ilike(f'%{search_query}%')) |
+            (Customer.email.ilike(f'%{search_query}%'))
+        )
+
+    if source:
+        query = query.filter(Customer.source == source)
+    
+    all_customers = query.order_by(Customer.created_at.desc()).all()
+    
+    return render_template("customerDatabase.html", 
+                         all_customers=all_customers,
+                         search_query=search_query,
+                         selected_source=source)
 
 @app.route("/inventory")
 @login_required
