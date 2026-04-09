@@ -17,7 +17,10 @@ protected admin screens plus a live Flask-Admin surface for internal use.
   query-backed business data.
 - `/admin/` is protected behind admin authentication and exposes registered
   business tables through Flask-Admin for local/internal development work.
-- CI runs pytest on Python 3.10 and 3.12 and also runs CodeQL analysis.
+- CI runs pytest on Python 3.10 and 3.12, CodeQL analysis, dependency review
+  on pull requests, and a Gitleaks secret scan on pushes and pull requests.
+- Dependabot is configured to open weekly update PRs for Python dependencies
+  and GitHub Actions workflow dependencies.
 
 ## Local Setup
 
@@ -78,6 +81,15 @@ GitHub Actions workflows:
 
 - `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
+- `.github/workflows/dependency-review.yml` blocks pull requests that introduce
+  new high-severity vulnerable dependencies
+- `.github/workflows/gitleaks.yml` scans pushes and pull requests for committed
+  secrets
+- `.github/dependabot.yml` schedules weekly update PRs for `pip` and GitHub
+  Actions dependencies
+
+If GitHub Secret Scanning is enabled for the repository, that native feature can
+coexist with the Gitleaks workflow or replace it later.
 
 ## Repository Layout
 
