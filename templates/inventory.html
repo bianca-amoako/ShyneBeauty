@@ -140,13 +140,18 @@
 <nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
   <div class="w3-container w3-row">
     <div class="w3-col s4">
-      <div class="w3-circle w3-margin-right" style="width:46px;height:46px;background:#d7ece8;"></div>
+      <img src="{{ url_for('static', filename='shyneIcon.png') }}" class="w3-circle w3-margin-right" style="width:46px">
     </div>
     <div class="w3-col s8 w3-bar">
-      <span>Welcome, <strong>Brittany</strong></span><br>
+      <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
       <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
+      <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
+        <button type="submit" class="w3-button sb-logout-button">
+          <i class="fa fa-sign-out"></i> Log out
+        </button>
+      </form>
     </div>
   </div>
   <hr>
@@ -160,20 +165,20 @@
       <i class="fa fa-remove fa-fw"></i> Close Menu
     </a>
 
-    <a href="/" class="w3-bar-item w3-button w3-padding">
+    <a href="{{ url_for('index') }}" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
     </a>
 
-    <a href="/orders" class="w3-bar-item w3-button w3-padding">
+    <a href="{{ url_for('orders') }}" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
     </a>
 
-    <a href="/inventory" class="w3-bar-item w3-button w3-padding sb-active">
+    <a href="{{ url_for('inventory') }}" class="w3-bar-item w3-button w3-padding sb-active">
       <i class="fa fa-cubes fa-fw"></i> Inventory
     </a>
 
-    <a href="#" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-folder-open fa-fw"></i> Files
+    <a href="{{ url_for('customers') }}" class="w3-bar-item w3-button w3-padding">
+      <i class="fa fa-users fa-fw"></i> Customers
     </a>
 
     <a href="#" class="w3-bar-item w3-button w3-padding">
