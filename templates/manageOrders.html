@@ -278,12 +278,13 @@
         <tr>
             <td>{{ order.id }}</td>
             <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
-            <td>{{ order.source_platform }}</td>
+            <td>{{ order.platform }}</td>
             <td>{% for item in order.order_items %} {{item.product.name}}, {% endfor %}</td>
             <td>{{ order.status }}</td>
             <td>{{ order.placed_at }}</td>
             <td>{{order.shipment.shipped_at}}</td>
             <td>${{ "%.2f"|format(order.total_amount) }}</td>
+            <td></td>
         </tr>
     {% endfor %}
       </table>

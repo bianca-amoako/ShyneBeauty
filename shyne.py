@@ -26,7 +26,7 @@ from flask_login import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
-from sqlalchemy import or_
+from sqlalchemy import inspect, or_, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 FAILED_LOGIN_THRESHOLD = 5
@@ -37,6 +37,8 @@ PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000000"
 DEV_TEST_ADMIN_EMAIL = "admin"
 DEV_TEST_ADMIN_PASSWORD = "admin"
 DEV_TEST_ADMIN_FULL_NAME = "Dev Admin"
+CUSTOMER_SOURCE_OPTIONS = ("Fiverr", "Square", "Manual Entry")
+GOOGLE_SHEETS_ORDER_SOURCE = "Google Sheets"
 SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
@@ -183,6 +185,26 @@ def require_dev_test_admin_mode(flask_app=None):
     )
 
 
+def ensure_customer_source_column():
+    inspector = inspect(db.engine)
+    if "customers" not in inspector.get_table_names():
+        return
+
+    customer_columns = {
+        column["name"] for column in inspector.get_columns("customers")
+    }
+    if "source" in customer_columns:
+        return
+
+    with db.engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE customers ADD COLUMN source VARCHAR(120)")
+        )
+        connection.execute(
+            text("CREATE INDEX IF NOT EXISTS idx_customers_source ON customers (source)")
+        )
+
+
 class AdminUser(UserMixin, db.Model):
     __bind_key__ = AUTH_BIND_KEY
     __tablename__ = "admin_users"
@@ -253,11 +275,25 @@ class Customer(db.Model):
     state = db.Column(db.String(120))
     postal_code = db.Column(db.String(30))
     country = db.Column(db.String(120), default="USA")
+    source = db.Column(db.String(120), index=True)
     created_at = db.Column(
         db.DateTime(timezone=True), default=utc_now, nullable=False
     )
 
     orders = db.relationship("Order", back_populates="customer", lazy=True)
+
+    @validates("source")
+    def validate_source(self, _key, value):
+        normalized = (value or "").strip()
+        if not normalized:
+            return None
+        if normalized not in CUSTOMER_SOURCE_OPTIONS:
+            raise ValueError(
+                "Customer source must be one of: "
+                + ", ".join(CUSTOMER_SOURCE_OPTIONS)
+                + "."
+            )
+        return normalized
 
 
 class Product(db.Model):
@@ -537,13 +573,24 @@ def inject_current_admin_label():
 @login_required
 def index():
     total_orders = db.session.query(Order).count()
-    ready_to_ship_count = db.session.query(Order).filter(Order.status == 'Ready').count()
+    ready_to_ship_count = db.session.query(Order).filter(Order.status == "Ready").count()
     completed_orders = db.session.query(Order).filter(Order.status == "Completed").count()
     fiverr_orders = db.session.query(Order).filter(Order.platform == "Fiverr").count()
     square_orders = db.session.query(Order).filter(Order.platform == "Square").count()
-    google_orders = db.session.query(Order).filter(Order.platform == "Sheets").count()
+    google_orders = db.session.query(Order).filter(
+        Order.platform == GOOGLE_SHEETS_ORDER_SOURCE
+    ).count()
     recent_orders = Order.query.order_by(Order.placed_at.desc()).limit(3).all()
-    return render_template("index.html", total_orders=total_orders, ready_to_ship_count=ready_to_ship_count, fiverr_orders=fiverr_orders, square_orders=square_orders, google_orders=google_orders, recent_orders=recent_orders, completed_orders=completed_orders)
+    return render_template(
+        "index.html",
+        total_orders=total_orders,
+        ready_to_ship_count=ready_to_ship_count,
+        fiverr_orders=fiverr_orders,
+        square_orders=square_orders,
+        google_orders=google_orders,
+        recent_orders=recent_orders,
+        completed_orders=completed_orders,
+    )
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -618,38 +665,40 @@ def login():
 @app.route("/orders")
 @login_required
 def orders():
-    search_query = request.args.get('search', '').strip()
-    source = request.args.get('source', '')
-    status = request.args.get('status', '')
+    search_query = request.args.get("search", "").strip()
+    source = request.args.get("source", "")
+    status = request.args.get("status", "")
 
     query = Order.query
-    
+
     if search_query:
         query = query.filter(
             or_(
-                Order.order_number.ilike(f'%{search_query}%'),
-                Order.customer.has(Customer.first_name.ilike(f'%{search_query}%')),
-                Order.customer.has(Customer.last_name.ilike(f'%{search_query}%'))
+                Order.order_number.ilike(f"%{search_query}%"),
+                Order.customer.has(Customer.first_name.ilike(f"%{search_query}%")),
+                Order.customer.has(Customer.last_name.ilike(f"%{search_query}%")),
             )
         )
-    
+
     if source:
         query = query.filter(Order.platform == source)
-    
+
     if status:
         query = query.filter(Order.status == status)
-    
+
     all_orders = query.options(
         db.joinedload(Order.customer),
         db.joinedload(Order.order_items).joinedload(OrderItem.product),
-        db.joinedload(Order.shipment)
+        db.joinedload(Order.shipment),
     ).order_by(Order.placed_at.desc()).all()
-    
-    return render_template("manageOrders.html", 
-                         all_orders=all_orders,
-                         search_query=search_query,
-                         selected_source=source,
-                         selected_status=status)
+
+    return render_template(
+        "manageOrders.html",
+        all_orders=all_orders,
+        search_query=search_query,
+        selected_source=source,
+        selected_status=status,
+    )
 
 
 @app.route("/tasks")
@@ -661,26 +710,28 @@ def tasks():
 @app.route("/customers")
 @login_required
 def customers():
-    search_query = request.args.get('search', '').strip()
-    source = request.args.get('source', '')
-    
+    search_query = request.args.get("search", "").strip()
+    source = request.args.get("source", "")
+
     query = Customer.query
     if search_query:
         query = query.filter(
-            (Customer.first_name.ilike(f'%{search_query}%')) |
-            (Customer.last_name.ilike(f'%{search_query}%')) |
-            (Customer.email.ilike(f'%{search_query}%'))
+            (Customer.first_name.ilike(f"%{search_query}%"))
+            | (Customer.last_name.ilike(f"%{search_query}%"))
+            | (Customer.email.ilike(f"%{search_query}%"))
         )
 
     if source:
         query = query.filter(Customer.source == source)
-    
+
     all_customers = query.order_by(Customer.created_at.desc()).all()
-    
-    return render_template("customerDatabase.html", 
-                         all_customers=all_customers,
-                         search_query=search_query,
-                         selected_source=source)
+
+    return render_template(
+        "customerDatabase.html",
+        all_customers=all_customers,
+        search_query=search_query,
+        selected_source=source,
+    )
 
 @app.route("/inventory")
 @login_required
@@ -699,6 +750,7 @@ def logout():
 @app.cli.command("init-db")
 def init_db_command():
     db.create_all(bind_key="__all__")
+    ensure_customer_source_column()
     print("Database initialized.")
 
 
