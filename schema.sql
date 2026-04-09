@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS customers (
     state TEXT,
     postal_code TEXT,
     country TEXT DEFAULT 'USA',
+    source TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS shipments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_source ON customers(source);
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_ingredients_name ON ingredients(name);
 CREATE INDEX IF NOT EXISTS idx_batches_code ON batches(batch_code);

@@ -1,9 +1,9 @@
 import os
-import pytest
 import sys
 import tempfile
 from pathlib import Path
-from sqlalchemy import inspect as sa_inspect
+
+import pytest
 
 # tests can import the app module if pytest is run from repo root or different working directory.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -29,18 +29,6 @@ from shyne import app as flask_app
 from shyne import db
 
 
-def clear_test_data():
-    db.session.remove()
-    for bind_key, metadata in db.metadatas.items():
-        engine = db.engine if bind_key is None else db.engines[bind_key]
-        existing_tables = set(sa_inspect(engine).get_table_names())
-        with engine.begin() as connection:
-            for table in reversed(metadata.sorted_tables):
-                if table.name in existing_tables:
-                    connection.execute(table.delete())
-    db.session.remove()
-
-
 @pytest.fixture()
 def app():
     flask_app.config.update(
@@ -52,11 +40,11 @@ def app():
     )
 
     with flask_app.app_context():
+        db.drop_all(bind_key="__all__")
         db.create_all(bind_key="__all__")
-        clear_test_data()
         yield flask_app
         db.session.remove()
-        clear_test_data()
+        db.drop_all(bind_key="__all__")
 
 
 @pytest.fixture()

@@ -88,7 +88,5 @@ GitHub Actions workflows:
 - `tests/`: pytest coverage for auth, protected routes, CLI commands, and model
   behavior
 - `schema.sql`: reference schema for the business tables
-- `SECURITY.md`: tracked summary of the current security posture and known auth
-  risks
 - `requirements.txt`: runtime and test dependencies
 - `.github/workflows/`: CI and code-scanning workflows

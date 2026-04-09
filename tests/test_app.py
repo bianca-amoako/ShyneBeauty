@@ -1,9 +1,10 @@
 import os
+import re
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from shyne import (
     AdminUser,
@@ -174,6 +175,11 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
         "order_status_events",
         "shipments",
     }.issubset(set(primary_inspector.get_table_names()))
+    assert {
+        column["name"] for column in primary_inspector.get_columns("customers")
+    } >= {
+        "source",
+    }
     assert "admin_users" not in set(primary_inspector.get_table_names())
     assert "admin_users" in set(auth_inspector.get_table_names())
 
@@ -188,6 +194,42 @@ def test_init_db_cli_command_is_idempotent(app):
     assert second_result.exit_code == 0
     assert "Database initialized." in first_result.output
     assert "Database initialized." in second_result.output
+
+
+def test_init_db_cli_command_adds_customer_source_column_to_existing_table(app):
+    with app.app_context():
+        db.drop_all(bind_key="__all__")
+        with db.engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE customers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        first_name TEXT NOT NULL,
+                        last_name TEXT NOT NULL,
+                        email TEXT NOT NULL UNIQUE,
+                        phone TEXT,
+                        street_address TEXT,
+                        city TEXT,
+                        state TEXT,
+                        postal_code TEXT,
+                        country TEXT DEFAULT 'USA',
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["init-db"])
+
+    assert result.exit_code == 0
+
+    with app.app_context():
+        customer_columns = {
+            column["name"] for column in inspect(db.engine).get_columns("customers")
+        }
+        assert "source" in customer_columns
 
 
 def test_create_admin_cli_command_creates_hashed_password(app):
@@ -286,6 +328,7 @@ def test_model_defaults_and_relationships_round_trip(app):
             first_name="Mia",
             last_name="Lopez",
             email="mia@example.com",
+            source="Fiverr",
         )
         product = Product(
             sku="SKU-001",
@@ -359,6 +402,7 @@ def test_model_defaults_and_relationships_round_trip(app):
         loaded_ingredient = Ingredient.query.filter_by(name="Hyaluronic Acid").one()
 
         assert loaded_customer.country == "USA"
+        assert loaded_customer.source == "Fiverr"
         assert loaded_product.active is True
         assert loaded_product.reorder_threshold == 0
         assert loaded_ingredient.unit == "g"
@@ -375,3 +419,124 @@ def test_model_defaults_and_relationships_round_trip(app):
         assert loaded_batch.batch_ingredients[0].ingredient is loaded_ingredient
         assert loaded_batch.product_batches[0].product is loaded_product
         assert loaded_product.product_batches[0].batch is loaded_batch
+
+
+def test_customer_source_defaults_to_none(app):
+    with app.app_context():
+        customer = Customer(
+            first_name="Ava",
+            last_name="Cole",
+            email="ava@example.com",
+        )
+
+        db.session.add(customer)
+        db.session.commit()
+        db.session.expire_all()
+
+        loaded_customer = Customer.query.filter_by(email="ava@example.com").one()
+
+        assert loaded_customer.source is None
+
+
+def test_customers_route_filters_by_source(client, admin_user, login, app):
+    with app.app_context():
+        fiverr_customer = Customer(
+            first_name="Avery",
+            last_name="Stone",
+            email="avery@example.com",
+            source="Fiverr",
+        )
+        square_customer = Customer(
+            first_name="Bianca",
+            last_name="Jones",
+            email="bianca@example.com",
+            source="Square",
+        )
+        db.session.add_all([fiverr_customer, square_customer])
+        db.session.commit()
+
+    login(client)
+
+    response = client.get("/customers?source=Fiverr")
+
+    assert response.status_code == 200
+    assert b"Avery Stone" in response.data
+    assert b"Bianca Jones" not in response.data
+
+
+def test_dashboard_and_orders_render_google_sheets_order_source(
+    client, admin_user, login, app
+):
+    with app.app_context():
+        customer = Customer(
+            first_name="Gia",
+            last_name="Sheets",
+            email="gia@example.com",
+        )
+        order = Order(
+            customer=customer,
+            order_number="ORD-GS-1",
+            platform="Google Sheets",
+            total_amount=Decimal("19.99"),
+        )
+        db.session.add_all([customer, order])
+        db.session.commit()
+
+    login(client)
+
+    dashboard_response = client.get("/")
+    orders_response = client.get("/orders")
+
+    dashboard_text = dashboard_response.get_data(as_text=True)
+    orders_text = orders_response.get_data(as_text=True)
+
+    assert dashboard_response.status_code == 200
+    assert orders_response.status_code == 200
+    assert re.search(r"Gia Sheets</td>\s*<td>Google Sheets</td>", dashboard_text)
+    assert re.search(r"Gia Sheets</td>\s*<td>Google Sheets</td>", orders_text)
+
+
+def test_google_sheets_source_filter_and_dashboard_count_use_canonical_value(
+    client, admin_user, login, app
+):
+    with app.app_context():
+        canonical_customer = Customer(
+            first_name="Cora",
+            last_name="Canonical",
+            email="cora@example.com",
+        )
+        legacy_customer = Customer(
+            first_name="Lena",
+            last_name="Legacy",
+            email="lena@example.com",
+        )
+        canonical_order = Order(
+            customer=canonical_customer,
+            order_number="ORD-GOOGLE-1",
+            platform="Google Sheets",
+            total_amount=Decimal("18.00"),
+        )
+        legacy_order = Order(
+            customer=legacy_customer,
+            order_number="ORD-SHEETS-1",
+            platform="Sheets",
+            total_amount=Decimal("11.00"),
+        )
+        db.session.add_all(
+            [canonical_customer, legacy_customer, canonical_order, legacy_order]
+        )
+        db.session.commit()
+
+    login(client)
+
+    filtered_response = client.get("/orders?source=Google+Sheets")
+    dashboard_response = client.get("/")
+
+    filtered_text = filtered_response.get_data(as_text=True)
+    dashboard_text = dashboard_response.get_data(as_text=True)
+
+    assert filtered_response.status_code == 200
+    assert dashboard_response.status_code == 200
+    assert "Cora Canonical" in filtered_text
+    assert "Lena Legacy" not in filtered_text
+    assert re.search(r"Google Sheets</td>\s*<td>1</td>", dashboard_text)
