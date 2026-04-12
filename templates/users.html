@@ -1,22 +1,484 @@
 {% extends "base_authenticated.html" %}
 
+{% macro hidden_filters(filter_state) -%}
+  <input type="hidden" name="search" value="{{ filter_state.search }}">
+  <input type="hidden" name="role_filter" value="{{ filter_state.role_filter }}">
+  <input type="hidden" name="status_filter" value="{{ filter_state.status_filter }}">
+  <input type="hidden" name="last_login_filter" value="{{ filter_state.last_login_filter }}">
+{%- endmacro %}
+
 {% block title %}Users & Access{% endblock %}
+{% block head_extra %}
+  <style>
+    .sb-users-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+      gap: 16px;
+    }
+
+    .sb-users-table td,
+    .sb-users-table th {
+      white-space: normal;
+    }
+
+    .sb-users-table tbody tr[data-selected="true"] {
+      background: #fbf4ea;
+    }
+
+    .sb-users-table .sb-actions-cell {
+      min-width: 130px;
+    }
+
+    .sb-inspector {
+      position: sticky;
+      top: 88px;
+      align-self: start;
+    }
+
+    .sb-inspector-section + .sb-inspector-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e8d9cd;
+    }
+
+    .sb-event-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sb-event-list li {
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ece2d5;
+    }
+
+    .sb-event-list li:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    @media (max-width: 980px) {
+      .sb-users-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sb-inspector {
+        position: static;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .sb-users-table thead {
+        display: none;
+      }
+
+      .sb-users-table,
+      .sb-users-table tbody,
+      .sb-users-table tr,
+      .sb-users-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .sb-users-table tr {
+        padding: 14px 12px;
+        border-bottom: 1px solid #ece2d5;
+      }
+
+      .sb-users-table td {
+        padding: 8px 0;
+        border-bottom: 0;
+      }
+
+      .sb-users-table td::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--sb-text-soft);
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
+    }
+  </style>
+{% endblock %}
+{% block page_title %}Users & Access{% endblock %}
+{% block page_description %}
+  <p>Manage internal staff accounts, fixed roles, and exceptional access details.</p>
+{% endblock %}
+{% block page_actions %}
+  {% if show_invite %}
+    <a
+      class="sb-button-secondary"
+      href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter) }}"
+    >
+      Close Invite
+    </a>
+  {% else %}
+    <a
+      class="sb-button"
+      href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter, show_invite='1') }}#selected-user-panel"
+    >
+      Invite user
+    </a>
+  {% endif %}
+{% endblock %}
 
 {% block content %}
-  <section class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
-    <header class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-      <h1 class="text-2xl font-semibold text-stone-900">Users &amp; Access</h1>
-      <p class="mt-2 max-w-3xl text-sm text-stone-600">
-        Fixed-role access management is available on this branch. The fuller table and onboarding
-        UI are layered in later stacked branches.
-      </p>
-    </header>
-
-    <section class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-      <h2 class="text-lg font-semibold text-stone-900">Current scope</h2>
-      <p class="mt-2 text-sm text-stone-600">
-        Superadmins manage business access here. The hidden Dev Admin role remains outside this surface.
-      </p>
-    </section>
+  <section class="sb-panel">
+    <form class="sb-form-grid" method="get" action="{{ url_for('users') }}">
+      {% if selected_user and not show_invite %}
+        <input type="hidden" name="selected_user" value="{{ selected_user.id }}">
+      {% endif %}
+      <div class="sb-form-row">
+        <div class="sb-field">
+          <label for="user-search">Search</label>
+          <input
+            class="sb-input"
+            id="user-search"
+            name="search"
+            type="text"
+            placeholder="Search by name or email"
+            value="{{ filter_state.search }}"
+          >
+        </div>
+        <div class="sb-field">
+          <label for="user-role-filter">Role</label>
+          <select class="sb-select" id="user-role-filter" name="role_filter">
+            <option value="">All Roles</option>
+            {% for role in role_options %}
+              <option value="{{ role }}" {% if filter_state.role_filter == role %}selected{% endif %}>{{ role }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="sb-field">
+          <label for="user-status-filter">Account Status</label>
+          <select class="sb-select" id="user-status-filter" name="status_filter">
+            <option value="">All Statuses</option>
+            {% for value, label in status_options %}
+              <option value="{{ value }}" {% if filter_state.status_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="sb-form-row">
+        <div class="sb-field">
+          <label for="user-last-login-filter">Last Login State</label>
+          <select class="sb-select" id="user-last-login-filter" name="last_login_filter">
+            <option value="">All States</option>
+            {% for value, label in last_login_options %}
+              <option value="{{ value }}" {% if filter_state.last_login_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="sb-field">
+          <span class="sb-inline-note">Hidden technical `Dev Admin` accounts are managed separately and do not appear in this table.</span>
+        </div>
+      </div>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Apply Filters</button>
+        <a class="sb-button-secondary" href="{{ url_for('users') }}">Reset</a>
+      </div>
+    </form>
   </section>
+
+  <div class="sb-users-layout">
+    <section class="sb-panel">
+      <div class="sb-table-wrap">
+        <table class="sb-data-table sb-users-table">
+          <caption>Internal staff accounts</caption>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">Role</th>
+              <th scope="col">Status</th>
+              <th scope="col">Scope Summary</th>
+              <th scope="col">Last Login</th>
+              <th scope="col">Created Date</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users_list %}
+              <tr {% if selected_user and selected_user.id == user.id %}data-selected="true"{% endif %}>
+                <td data-label="Name">{{ user.full_name or "No name set" }}</td>
+                <td data-label="Email">{{ user.email }}</td>
+                <td data-label="Role">{{ user.get_role() }}</td>
+                <td data-label="Status">
+                  {% set display_status = user.display_status(comparison_time) %}
+                  <span
+                    class="sb-status
+                    {% if display_status == 'Active' %}sb-status-active
+                    {% elif display_status in ('Pending invite', 'Expired invite', 'Locked') %}sb-status-pending
+                    {% else %}sb-status-suspended{% endif %}"
+                  >
+                    {{ display_status }}
+                  </span>
+                </td>
+                <td data-label="Scope Summary">{{ role_scope_summary(user.get_role()) }}</td>
+                <td data-label="Last Login">
+                  {% if user.last_login_at %}
+                    {{ user.last_login_at }}
+                  {% else %}
+                    Never
+                  {% endif %}
+                </td>
+                <td data-label="Created Date">{{ user.created_at }}</td>
+                <td data-label="Actions" class="sb-actions-cell">
+                  <a
+                    class="sb-button-secondary"
+                    href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter, selected_user=user.id) }}#selected-user-panel"
+                  >
+                    View details for {{ user.full_name or user.email }}
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="8" class="sb-empty">
+                  {% if filter_state.search or filter_state.role_filter or filter_state.status_filter or filter_state.last_login_filter %}
+                    No users match the current filters.
+                  {% else %}
+                    No internal staff accounts are available yet.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="sb-panel sb-inspector" id="selected-user-panel" tabindex="-1" aria-labelledby="selected-user-heading">
+      {% if show_invite %}
+        <h2 id="selected-user-heading">Invite user</h2>
+        <p class="sb-section-note">Create an internal account invitation with a fixed business role. `Dev Admin` stays outside this flow.</p>
+        <form class="sb-form-grid" method="post" action="{{ url_for('invite_user') }}">
+          {{ hidden_filters(filter_state) }}
+          <div class="sb-field">
+            <label for="invite-full-name">Full Name</label>
+            <input class="sb-input" id="invite-full-name" name="full_name" type="text" autofocus>
+          </div>
+          <div class="sb-field">
+            <label for="invite-email">Email</label>
+            <input class="sb-input" id="invite-email" name="email" type="email" inputmode="email" autocomplete="email" required>
+          </div>
+          <div class="sb-field">
+            <label for="invite-role">Role</label>
+            <select class="sb-select" id="invite-role" name="role" required>
+              {% for role in role_options %}
+                <option value="{{ role }}">{{ role }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="sb-form-actions">
+            <button class="sb-button" type="submit">Invite user</button>
+            <a class="sb-button-secondary" href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter) }}">Cancel</a>
+          </div>
+        </form>
+      {% elif selected_user %}
+        <h2 id="selected-user-heading">{{ selected_user.full_name or selected_user.email }}</h2>
+        <p class="sb-section-note">{{ selected_user.email }}</p>
+
+        <section class="sb-inspector-section">
+          <h3>Identity Summary</h3>
+          <dl class="sb-meta-list">
+            <div>
+              <dt>Role</dt>
+              <dd>{{ selected_user.get_role() }}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{{ selected_user.display_status(comparison_time) }}</dd>
+            </div>
+            <div>
+              <dt>Scope Summary</dt>
+              <dd>{{ role_scope_summary(selected_user.get_role()) }}</dd>
+            </div>
+            <div>
+              <dt>Last Login</dt>
+              <dd>{{ selected_user.last_login_at or "Never" }}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{{ selected_user.created_at }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="sb-inspector-section">
+          <h3>Effective Permissions Summary</h3>
+          <ul class="sb-pill-list">
+            {% for permission_label in permission_labels(get_effective_permissions(selected_user)) %}
+              <li>{{ permission_label }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+
+        <section class="sb-inspector-section">
+          <h3>Exception Overrides</h3>
+          {% if selected_user.get_permission_overrides() %}
+            <ul class="sb-pill-list">
+              {% for override_key in selected_user.get_permission_overrides() %}
+                <li>{{ override_key }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="sb-section-note">No exceptions to the assigned role.</p>
+          {% endif %}
+        </section>
+
+        <section class="sb-inspector-section">
+          <h3>Access State</h3>
+          <dl class="sb-meta-list">
+            <div>
+              <dt>Invited By</dt>
+              <dd>{{ resolve_actor_name(selected_user.invited_by_user_id) }}</dd>
+            </div>
+            <div>
+              <dt>Access Granted By</dt>
+              <dd>{{ resolve_actor_name(selected_user.access_granted_by_user_id) }}</dd>
+            </div>
+            <div>
+              <dt>Last Role Change</dt>
+              <dd>
+                {% if selected_user.last_role_changed_at %}
+                  {{ selected_user.last_role_changed_at }} by {{ resolve_actor_name(selected_user.last_role_changed_by_user_id) }}
+                {% else %}
+                  No role changes recorded
+                {% endif %}
+              </dd>
+            </div>
+            <div>
+              <dt>Lock State</dt>
+              <dd>
+                {% if selected_user.is_locked(comparison_time) %}
+                  Locked until {{ selected_user.locked_until }}
+                {% else %}
+                  No active lock
+                {% endif %}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="sb-inspector-section">
+          <h3>Change Role</h3>
+          <form class="sb-form-grid" method="post" action="{{ url_for('update_user_role', user_id=selected_user.id) }}">
+            {{ hidden_filters(filter_state) }}
+            <div class="sb-field">
+              <label for="role-{{ selected_user.id }}">Role</label>
+              <select class="sb-select" id="role-{{ selected_user.id }}" name="role" autofocus>
+                {% for role in role_options %}
+                  <option value="{{ role }}" {% if selected_user.get_role() == role %}selected{% endif %}>{{ role }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="sb-form-actions">
+              <button class="sb-button" type="submit">Change role</button>
+            </div>
+          </form>
+          {% if selected_user.get_role() == 'Superadmin' %}
+            <p class="sb-inline-note">Last active superadmin protections apply.</p>
+          {% endif %}
+        </section>
+
+        {% if selected_user.get_account_status() == 'invited' %}
+          <section class="sb-inspector-section">
+            <h3>Activate Account</h3>
+            <p class="sb-inline-note">Pending invites require an initial password before the user can sign in.</p>
+            <form class="sb-form-grid" method="post" action="{{ url_for('activate_user', user_id=selected_user.id) }}">
+              {{ hidden_filters(filter_state) }}
+              <div class="sb-field">
+                <label for="activate-password-{{ selected_user.id }}">Initial Password</label>
+                <input class="sb-input" id="activate-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
+              </div>
+              <div class="sb-field">
+                <label for="activate-password-confirm-{{ selected_user.id }}">Confirm Password</label>
+                <input class="sb-input" id="activate-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
+              </div>
+              <div class="sb-form-actions">
+                <button class="sb-button" type="submit">Activate account</button>
+              </div>
+            </form>
+          </section>
+        {% endif %}
+
+        {% if selected_user.get_account_status() == 'active' %}
+          <section class="sb-inspector-section">
+            <h3>Reset Password</h3>
+            <form class="sb-form-grid" method="post" action="{{ url_for('set_temporary_password', user_id=selected_user.id) }}">
+              {{ hidden_filters(filter_state) }}
+              <div class="sb-field">
+                <label for="temporary-password-{{ selected_user.id }}">New Password</label>
+                <input class="sb-input" id="temporary-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
+              </div>
+              <div class="sb-field">
+                <label for="temporary-password-confirm-{{ selected_user.id }}">Confirm Password</label>
+                <input class="sb-input" id="temporary-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
+              </div>
+              <div class="sb-form-actions">
+                <button class="sb-button-secondary" type="submit">Reset password</button>
+              </div>
+            </form>
+          </section>
+        {% endif %}
+
+        <section class="sb-inspector-section sb-danger-zone">
+          <h3>Dangerous Actions</h3>
+          {% if selected_user.get_account_status() == 'invited' %}
+            <div class="sb-form-actions">
+              <form method="post" action="{{ url_for('resend_invite', user_id=selected_user.id) }}">
+                {{ hidden_filters(filter_state) }}
+                <button class="sb-button-secondary" type="submit">Resend invite</button>
+              </form>
+              <form method="post" action="{{ url_for('cancel_invite', user_id=selected_user.id) }}">
+                {{ hidden_filters(filter_state) }}
+                <button class="sb-button-danger" type="submit">Cancel invite</button>
+              </form>
+            </div>
+          {% elif selected_user.get_account_status() == 'active' %}
+            <form method="post" action="{{ url_for('suspend_user', user_id=selected_user.id) }}">
+              {{ hidden_filters(filter_state) }}
+              <button class="sb-button-danger" type="submit">Suspend account</button>
+            </form>
+          {% else %}
+            <form method="post" action="{{ url_for('reactivate_user', user_id=selected_user.id) }}">
+              {{ hidden_filters(filter_state) }}
+              <button class="sb-button" type="submit">Reactivate account</button>
+            </form>
+          {% endif %}
+        </section>
+
+        <section class="sb-inspector-section">
+          <h3>Recent Access Actions</h3>
+          <ul class="sb-event-list">
+            {% for event in selected_user_events %}
+              <li>
+                <strong>{{ event.event_type.replace('.', ' ') }}</strong><br>
+                <span class="sb-inline-note">{{ event.created_at }}{% if event.note %} · {{ event.note }}{% endif %}</span>
+              </li>
+            {% else %}
+              <li class="sb-empty">No access events recorded yet.</li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% else %}
+        <h2 id="selected-user-heading">Selected user</h2>
+        <p class="sb-section-note">Choose a row to review account details, permissions, and sensitive actions.</p>
+      {% endif %}
+    </aside>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    if (window.location.hash === "#selected-user-panel") {
+      const panel = document.getElementById("selected-user-panel");
+      if (panel) {
+        panel.focus();
+      }
+    }
+  </script>
 {% endblock %}
