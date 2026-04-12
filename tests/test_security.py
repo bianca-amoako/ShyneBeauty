@@ -613,7 +613,7 @@ def test_runtime_auth_schema_compatibility_upgrades_legacy_admin_table_before_us
                         "failed_login_count": 0,
                         "locked_until": None,
                         "last_login_at": None,
-                        "created_at": datetime.now(timezone.utc),
+                        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                     },
                 )
 

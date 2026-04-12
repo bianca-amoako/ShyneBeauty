@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,12 @@ os.environ.setdefault(
 os.environ.setdefault(
     "AUTH_DATABASE_URL",
     f"sqlite:///{AUTH_TEST_DB.as_posix()}",
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"datetime\.datetime\.utcnow\(\) is deprecated and scheduled for removal.*",
+    category=DeprecationWarning,
 )
 
 from shyne import AdminUser
