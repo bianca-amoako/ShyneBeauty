@@ -7,8 +7,10 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 
 from shyne import (
+    ACCOUNT_STATUS_ACTIVE,
     AdminUser,
     Batch,
+    AdminAccessEvent,
     BatchIngredient,
     Customer,
     Ingredient,
@@ -19,6 +21,8 @@ from shyne import (
     PASSWORD_HASH_METHOD,
     Product,
     ProductBatch,
+    ROLE_DEV_ADMIN,
+    ROLE_SUPERADMIN,
     Shipment,
     db,
     load_project_env,
@@ -150,6 +154,8 @@ def test_routes_are_registered(app):
     assert "/login" in routes
     assert "/orders" in routes
     assert "/customers" in routes
+    assert "/inventory" in routes
+    assert "/users" in routes
     assert "/tasks" in routes
     assert "/logout" in routes
 
@@ -182,6 +188,17 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
     }
     assert "admin_users" not in set(primary_inspector.get_table_names())
     assert "admin_users" in set(auth_inspector.get_table_names())
+    assert "admin_access_events" in set(auth_inspector.get_table_names())
+    assert {
+        column["name"] for column in auth_inspector.get_columns("admin_users")
+    } >= {
+        "role",
+        "account_status",
+        "invited_at",
+        "invited_by_user_id",
+        "activated_at",
+        "permission_overrides_json",
+    }
 
 
 def test_init_db_cli_command_is_idempotent(app):
@@ -249,6 +266,8 @@ def test_create_admin_cli_command_creates_hashed_password(app):
         assert user.password_hash != password
         assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
         assert user.check_password(password) is True
+        assert user.get_role() == ROLE_SUPERADMIN
+        assert user.get_account_status() == ACCOUNT_STATUS_ACTIVE
         assert "admin_users" not in set(inspect(db.engine).get_table_names())
         assert "admin_users" in set(inspect(db.engines["auth"]).get_table_names())
 
@@ -314,12 +333,59 @@ def test_seed_dev_admin_cli_command_upserts_dev_admin(app):
         user = AdminUser.query.filter_by(email="admin").one()
         assert user.full_name == "Dev Admin"
         assert user.is_active is True
+        assert user.get_role() == ROLE_DEV_ADMIN
         assert user.failed_login_count == 0
         assert user.locked_until is None
         assert user.password_hash != "admin"
         assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
         assert user.check_password("admin") is True
         assert AdminUser.query.filter_by(email="admin").count() == 1
+
+
+def test_create_dev_admin_cli_command_creates_hidden_dev_admin(app):
+    runner = app.test_cli_runner()
+    password = "StrongPassw0rd!"
+
+    result = runner.invoke(
+        args=["create-dev-admin", "--email", "tech@shynebeauty.com"],
+        input=f"{password}\n{password}\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Dev Admin created: tech@shynebeauty.com" in result.output
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="tech@shynebeauty.com").one()
+        assert user.get_role() == ROLE_DEV_ADMIN
+        assert user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+
+
+def test_backfill_admin_access_requires_explicit_superadmin_assignment(app, admin_factory):
+    with app.app_context():
+        admin_factory(
+            email="legacy@shynebeauty.com",
+            full_name="Legacy Admin",
+            role=None,
+            account_status=None,
+        )
+
+    runner = app.test_cli_runner()
+    failure = runner.invoke(args=["backfill-admin-access"])
+    success = runner.invoke(
+        args=[
+            "backfill-admin-access",
+            "--first-superadmin-email",
+            "legacy@shynebeauty.com",
+        ]
+    )
+
+    assert failure.exit_code != 0
+    assert "zero active superadmins" in failure.output
+    assert success.exit_code == 0
+
+    with app.app_context():
+        user = AdminUser.query.filter_by(email="legacy@shynebeauty.com").one()
+        assert user.get_role() == ROLE_SUPERADMIN
 
 
 def test_model_defaults_and_relationships_round_trip(app):

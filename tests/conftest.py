@@ -25,8 +25,15 @@ os.environ.setdefault(
 )
 
 from shyne import AdminUser
+from shyne import ACCOUNT_STATUS_ACTIVE
+from shyne import ACCOUNT_STATUS_INVITED
+from shyne import ACCOUNT_STATUS_SUSPENDED
+from shyne import ROLE_DEV_ADMIN
+from shyne import ROLE_STAFF_OPERATOR
+from shyne import ROLE_SUPERADMIN
 from shyne import app as flask_app
 from shyne import db
+from shyne import utc_now
 
 
 @pytest.fixture()
@@ -88,6 +95,92 @@ def admin_user(app):
             full_name="Shyne Admin",
         )
         user.set_password("correct-horse-battery-staple")
+        user.set_role(ROLE_SUPERADMIN, now=utc_now())
+        user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=utc_now())
         db.session.add(user)
         db.session.commit()
+        return user.id
+
+
+@pytest.fixture()
+def admin_factory(app):
+    with app.app_context():
+        created_count = {"value": 0}
+
+        def _create_admin(
+            *,
+            email=None,
+            full_name="Shyne Admin",
+            password="correct-horse-battery-staple",
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_ACTIVE,
+            failed_login_count=0,
+            locked_until=None,
+            last_login_at=None,
+            permission_overrides=None,
+        ):
+            created_count["value"] += 1
+            comparison_time = utc_now()
+            user = AdminUser(
+                email=email or f"admin{created_count['value']}@shynebeauty.com",
+                full_name=full_name,
+                failed_login_count=failed_login_count,
+                locked_until=locked_until,
+                last_login_at=last_login_at,
+            )
+            if password is not None:
+                user.set_password(password)
+            else:
+                user.password_hash = ""
+            if role is not None:
+                user.set_role(role, now=comparison_time)
+            if account_status is not None:
+                user.set_account_status(account_status, now=comparison_time)
+            else:
+                user.account_status = None
+                user.is_active = True
+            if account_status == ACCOUNT_STATUS_INVITED:
+                user.invited_by_user_id = 1
+            if permission_overrides is not None:
+                user.set_permission_overrides(permission_overrides)
+            db.session.add(user)
+            db.session.commit()
+            return user
+
+        yield _create_admin
+
+
+@pytest.fixture()
+def staff_user(app, admin_factory):
+    with app.app_context():
+        user = admin_factory(
+            email="staff@shynebeauty.com",
+            full_name="Staff User",
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_ACTIVE,
+        )
+        return user.id
+
+
+@pytest.fixture()
+def dev_admin_user(app, admin_factory):
+    with app.app_context():
+        user = admin_factory(
+            email="devadmin@shynebeauty.com",
+            full_name="Dev Admin",
+            role=ROLE_DEV_ADMIN,
+            account_status=ACCOUNT_STATUS_ACTIVE,
+        )
+        return user.id
+
+
+@pytest.fixture()
+def suspended_user(app, admin_factory):
+    with app.app_context():
+        user = admin_factory(
+            email="suspended@shynebeauty.com",
+            full_name="Suspended User",
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_SUSPENDED,
+        )
         return user.id
