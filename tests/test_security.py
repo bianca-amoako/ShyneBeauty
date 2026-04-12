@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
-from shyne import AdminUser, db
+from shyne import AUTH_BIND_KEY, ACCOUNT_STATUS_ACTIVE, AdminUser, ROLE_STAFF_OPERATOR, ROLE_SUPERADMIN, db
 
 
-@pytest.mark.parametrize("route", ["/", "/orders", "/tasks", "/customers", "/admin/"])
+@pytest.mark.parametrize(
+    "route", ["/", "/orders", "/tasks", "/customers", "/inventory", "/users", "/admin/"]
+)
 def test_anonymous_access_to_protected_routes_redirects_to_login(client, route):
     response = client.get(route)
 
@@ -331,7 +333,8 @@ def test_seeded_dev_test_admin_still_locks_after_repeated_failed_attempts(client
         ("/orders", b"Manage Orders"),
         ("/tasks", b"Task List"),
         ("/customers", b"Customer Database"),
-        ("/admin/", b"ShyneBeauty Admin"),
+        ("/inventory", b"Inventory Page"),
+        ("/users", b"Users & Access"),
     ],
 )
 def test_authenticated_users_can_reach_protected_routes(
@@ -345,3 +348,139 @@ def test_authenticated_users_can_reach_protected_routes(
     assert response.headers["Cache-Control"] == "no-store"
     assert response.content_type.startswith("text/html")
     assert expected_text in response.data
+
+
+def test_superadmin_is_denied_admin_console_access(client, admin_user, login):
+    login(client)
+
+    response = client.get("/admin/")
+
+    assert response.status_code == 403
+    assert b"Admin console access denied" in response.data
+
+
+def test_staff_operator_is_denied_users_access(client, staff_user, login):
+    response = login(
+        client,
+        email="staff@shynebeauty.com",
+        password="correct-horse-battery-staple",
+    )
+
+    assert response.status_code == 302
+
+    denied_response = client.get("/users")
+
+    assert denied_response.status_code == 403
+    assert b"Users &amp; Access denied" in denied_response.data
+
+
+def test_dev_admin_can_access_admin_console_but_not_users(client, dev_admin_user, login):
+    response = login(
+        client,
+        email="devadmin@shynebeauty.com",
+        password="correct-horse-battery-staple",
+    )
+
+    assert response.status_code == 302
+
+    admin_response = client.get("/admin/")
+    users_response = client.get("/users")
+
+    assert admin_response.status_code == 200
+    assert b"ShyneBeauty Admin" in admin_response.data
+    assert users_response.status_code == 403
+    assert b"Users &amp; Access denied" in users_response.data
+
+
+def test_runtime_auth_schema_compatibility_upgrades_legacy_admin_table_before_user_load(
+    client, app
+):
+    try:
+        with app.app_context():
+            db.session.remove()
+            db.drop_all(bind_key=AUTH_BIND_KEY)
+            auth_engine = db.engines[AUTH_BIND_KEY]
+            with auth_engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        CREATE TABLE admin_users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            email VARCHAR(255) NOT NULL UNIQUE,
+                            password_hash VARCHAR(255),
+                            full_name VARCHAR(255),
+                            is_active BOOLEAN NOT NULL DEFAULT 1,
+                            failed_login_count INTEGER NOT NULL DEFAULT 0,
+                            locked_until DATETIME,
+                            last_login_at DATETIME,
+                            created_at DATETIME NOT NULL
+                        )
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO admin_users (
+                            id,
+                            email,
+                            password_hash,
+                            full_name,
+                            is_active,
+                            failed_login_count,
+                            locked_until,
+                            last_login_at,
+                            created_at
+                        ) VALUES (
+                            :id,
+                            :email,
+                            :password_hash,
+                            :full_name,
+                            :is_active,
+                            :failed_login_count,
+                            :locked_until,
+                            :last_login_at,
+                            :created_at
+                        )
+                        """
+                    ),
+                    {
+                        "id": 1,
+                        "email": "legacy@shynebeauty.com",
+                        "password_hash": "legacy-hash",
+                        "full_name": "Legacy Admin",
+                        "is_active": True,
+                        "failed_login_count": 0,
+                        "locked_until": None,
+                        "last_login_at": None,
+                        "created_at": datetime.now(timezone.utc),
+                    },
+                )
+
+        with client.session_transaction() as session_data:
+            session_data["_user_id"] = "1"
+            session_data["_fresh"] = True
+
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert b"Home Dashboard / Analytics" in response.data
+
+        with app.app_context():
+            auth_inspector = inspect(db.engines[AUTH_BIND_KEY])
+            assert "admin_access_events" in set(auth_inspector.get_table_names())
+            assert {
+                column["name"] for column in auth_inspector.get_columns("admin_users")
+            } >= {
+                "role",
+                "account_status",
+                "permission_overrides_json",
+            }
+            user = db.session.get(AdminUser, 1)
+            assert user.get_role() == "Staff Operator"
+            assert user.get_account_status() == "active"
+    finally:
+        with app.app_context():
+            db.session.remove()
+            db.drop_all(bind_key=AUTH_BIND_KEY)
+            db.create_all(bind_key=AUTH_BIND_KEY)

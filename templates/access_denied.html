@@ -1,0 +1,17 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}{{ page_title }} | ShyneBeauty{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_description %}
+  <p>{{ denial_message }}</p>
+{% endblock %}
+
+{% block content %}
+  <section class="sb-panel">
+    <h2>What to do next</h2>
+    <p class="sb-section-note">
+      If you expected access, contact a Superadmin for business access changes or a
+      Dev Admin for technical console access.
+    </p>
+  </section>
+{% endblock %}

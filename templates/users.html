@@ -1,0 +1,22 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}Users & Access{% endblock %}
+
+{% block content %}
+  <section class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
+    <header class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+      <h1 class="text-2xl font-semibold text-stone-900">Users &amp; Access</h1>
+      <p class="mt-2 max-w-3xl text-sm text-stone-600">
+        Fixed-role access management is available on this branch. The fuller table and onboarding
+        UI are layered in later stacked branches.
+      </p>
+    </header>
+
+    <section class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+      <h2 class="text-lg font-semibold text-stone-900">Current scope</h2>
+      <p class="mt-2 text-sm text-stone-600">
+        Superadmins manage business access here. The hidden Dev Admin role remains outside this surface.
+      </p>
+    </section>
+  </section>
+{% endblock %}
