@@ -736,8 +736,38 @@ def customers():
 @app.route("/inventory")
 @login_required
 def inventory():
-    return render_template("inventory.html")
+    search_query = request.args.get('search', '').strip()
+    category = request.args.get('category', '')
+    stock_status = request.args.get('stock_status', '')
 
+    query = Ingredient.query
+    
+
+    if search_query:
+        query = query.filter(Ingredient.name.ilike(f'%{search_query}%'))
+
+    if category:
+        query = query.filter(Ingredient.category == category)
+    
+
+    if stock_status:
+        if stock_status == 'in_stock':
+            query = query.filter(Ingredient.stock_quantity > Ingredient.reorder_threshold)
+        elif stock_status == 'low_stock':
+            query = query.filter(
+                Ingredient.stock_quantity <= Ingredient.reorder_threshold,
+                Ingredient.stock_quantity > 0
+            )
+        elif stock_status == 'out_of_stock':
+            query = query.filter(Ingredient.stock_quantity == 0)
+    
+    all_items = query.order_by(Ingredient.name).all()
+    
+    return render_template("inventory.html", 
+                         all_items=all_items,
+                         search_query=search_query,
+                         selected_category=category,
+                         selected_stock_status=stock_status)
 
 @app.route("/logout", methods=["POST"])
 @login_required
