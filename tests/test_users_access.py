@@ -19,7 +19,7 @@ def test_superadmin_can_view_users_page(client, admin_user, login):
 
     assert response.status_code == 200
     assert b"Users & Access" in response.data
-    assert b"Invite user" in response.data
+    assert b"Create user" in response.data
 
 
 def test_dev_admin_is_hidden_from_users_table(client, admin_user, dev_admin_user, login):
@@ -31,25 +31,66 @@ def test_dev_admin_is_hidden_from_users_table(client, admin_user, dev_admin_user
     assert b"devadmin@shynebeauty.com" not in response.data
 
 
-def test_superadmin_can_invite_business_user(client, admin_user, app, login):
+def test_create_user_with_manual_temporary_password(
+    client, admin_user, app, login
+):
+    login(client)
+
+    invite_response = client.post(
+        "/users/invite",
+        data={
+            "full_name": "Taylor Temp",
+            "email": "taylor@shynebeauty.com",
+            "role": ROLE_STAFF_OPERATOR,
+            "password_mode": "manual",
+            "password": "TempPassw0rd!",
+            "password_confirmation": "TempPassw0rd!",
+        },
+    )
+
+    assert invite_response.status_code == 302
+
+    with app.app_context():
+        created_user = AdminUser.query.filter_by(email="taylor@shynebeauty.com").one()
+        assert created_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+        assert created_user.get_role() == ROLE_STAFF_OPERATOR
+        assert created_user.check_password("TempPassw0rd!") is True
+        assert created_user.requires_password_change() is True
+
+    client.post("/logout")
+    login_response = login(
+        client,
+        email="taylor@shynebeauty.com",
+        password="TempPassw0rd!",
+    )
+
+    assert login_response.status_code == 302
+    assert "/change-password" in login_response.headers["Location"]
+
+
+def test_create_user_with_generated_temporary_password_shows_password_once(
+    client, admin_user, app, login
+):
     login(client)
 
     response = client.post(
         "/users/invite",
         data={
-            "full_name": "New Operator",
-            "email": "new-operator@shynebeauty.com",
+            "full_name": "Jordan Generated",
+            "email": "jordan@shynebeauty.com",
             "role": ROLE_STAFF_OPERATOR,
+            "password_mode": "generated",
         },
+        follow_redirects=True,
     )
 
-    assert response.status_code == 302
+    assert response.status_code == 200
+    assert b"Temporary password (shown once):" in response.data
 
     with app.app_context():
-        invited = AdminUser.query.filter_by(email="new-operator@shynebeauty.com").one()
-        assert invited.get_role() == ROLE_STAFF_OPERATOR
-        assert invited.get_account_status() == ACCOUNT_STATUS_INVITED
-        assert invited.invited_at is not None
+        created_user = AdminUser.query.filter_by(email="jordan@shynebeauty.com").one()
+        assert created_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+        assert created_user.requires_password_change() is True
 
 
 def test_last_active_superadmin_cannot_be_demoted(client, admin_user, app, login):
@@ -111,7 +152,7 @@ def test_superadmin_can_demote_another_superadmin_when_not_last(
         assert user.get_role() == ROLE_STAFF_OPERATOR
 
 
-def test_superadmin_can_reset_password_for_active_business_user(
+def test_superadmin_can_set_temporary_password_for_active_business_user(
     client, admin_user, staff_user, app, login
 ):
     login(client)
@@ -119,8 +160,8 @@ def test_superadmin_can_reset_password_for_active_business_user(
     response = client.post(
         f"/users/{staff_user}/temporary-password",
         data={
-            "password": "NewPassw0rd!",
-            "password_confirmation": "NewPassw0rd!",
+            "password": "NewTempPassw0rd!",
+            "password_confirmation": "NewTempPassw0rd!",
         },
     )
 
@@ -128,10 +169,13 @@ def test_superadmin_can_reset_password_for_active_business_user(
 
     with app.app_context():
         user = db.session.get(AdminUser, staff_user)
-        assert user.check_password("NewPassw0rd!") is True
+        assert user.check_password("NewTempPassw0rd!") is True
+        assert user.requires_password_change() is True
 
 
-def test_pending_invite_can_be_activated(client, admin_user, admin_factory, app, login):
+def test_legacy_pending_invite_can_still_be_activated_with_temporary_password(
+    client, admin_user, admin_factory, app, login
+):
     with app.app_context():
         invited_user = admin_factory(
             email="legacy-invite@shynebeauty.com",
@@ -147,8 +191,8 @@ def test_pending_invite_can_be_activated(client, admin_user, admin_factory, app,
     response = client.post(
         f"/users/{invited_user_id}/activate",
         data={
-            "password": "WelcomePassw0rd!",
-            "password_confirmation": "WelcomePassw0rd!",
+            "password": "LegacyTempPassw0rd!",
+            "password_confirmation": "LegacyTempPassw0rd!",
         },
     )
 
@@ -157,7 +201,8 @@ def test_pending_invite_can_be_activated(client, admin_user, admin_factory, app,
     with app.app_context():
         activated_user = db.session.get(AdminUser, invited_user_id)
         assert activated_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
-        assert activated_user.check_password("WelcomePassw0rd!") is True
+        assert activated_user.requires_password_change() is True
+        assert activated_user.check_password("LegacyTempPassw0rd!") is True
 
 
 def test_users_page_can_filter_pending_invites(

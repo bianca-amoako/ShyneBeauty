@@ -112,14 +112,14 @@
       class="sb-button-secondary"
       href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter) }}"
     >
-      Close Invite
+      Close Create User
     </a>
   {% else %}
     <a
       class="sb-button"
       href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter, show_invite='1') }}#selected-user-panel"
     >
-      Invite user
+      Create user
     </a>
   {% endif %}
 {% endblock %}
@@ -252,8 +252,8 @@
 
     <aside class="sb-panel sb-inspector" id="selected-user-panel" tabindex="-1" aria-labelledby="selected-user-heading">
       {% if show_invite %}
-        <h2 id="selected-user-heading">Invite user</h2>
-        <p class="sb-section-note">Create an internal account invitation with a fixed business role. `Dev Admin` stays outside this flow.</p>
+        <h2 id="selected-user-heading">Create user</h2>
+        <p class="sb-section-note">Create an active account with a temporary password. The user will be forced to change it on first login.</p>
         <form class="sb-form-grid" method="post" action="{{ url_for('invite_user') }}">
           {{ hidden_filters(filter_state) }}
           <div class="sb-field">
@@ -272,8 +272,26 @@
               {% endfor %}
             </select>
           </div>
+          <div class="sb-field">
+            <label for="password-mode">Temporary Password Mode</label>
+            <select class="sb-select" id="password-mode" name="password_mode">
+              <option value="generated">System generated</option>
+              <option value="manual">Admin entered</option>
+            </select>
+          </div>
+          <div class="sb-field" id="generated-password-note">
+            <span class="sb-inline-note">The app will generate a strong temporary password and show it once after the account is created.</span>
+          </div>
+          <div class="sb-field" id="manual-password-field" hidden>
+            <label for="create-password">Temporary Password</label>
+            <input class="sb-input" id="create-password" name="password" type="password" autocomplete="new-password">
+          </div>
+          <div class="sb-field" id="manual-password-confirm-field" hidden>
+            <label for="create-password-confirm">Confirm Temporary Password</label>
+            <input class="sb-input" id="create-password-confirm" name="password_confirmation" type="password" autocomplete="new-password">
+          </div>
           <div class="sb-form-actions">
-            <button class="sb-button" type="submit">Invite user</button>
+            <button class="sb-button" type="submit">Create user</button>
             <a class="sb-button-secondary" href="{{ url_for('users', search=filter_state.search, role_filter=filter_state.role_filter, status_filter=filter_state.status_filter, last_login_filter=filter_state.last_login_filter) }}">Cancel</a>
           </div>
         </form>
@@ -299,6 +317,10 @@
             <div>
               <dt>Last Login</dt>
               <dd>{{ selected_user.last_login_at or "Never" }}</dd>
+            </div>
+            <div>
+              <dt>Password State</dt>
+              <dd>{{ password_state_label(selected_user) }}</dd>
             </div>
             <div>
               <dt>Created</dt>
@@ -387,15 +409,15 @@
         {% if selected_user.get_account_status() == 'invited' %}
           <section class="sb-inspector-section">
             <h3>Activate Account</h3>
-            <p class="sb-inline-note">Pending invites require an initial password before the user can sign in.</p>
+            <p class="sb-inline-note">Legacy invited account support only. Activation sets a temporary password and requires the user to change it on first login.</p>
             <form class="sb-form-grid" method="post" action="{{ url_for('activate_user', user_id=selected_user.id) }}">
               {{ hidden_filters(filter_state) }}
               <div class="sb-field">
-                <label for="activate-password-{{ selected_user.id }}">Initial Password</label>
+                <label for="activate-password-{{ selected_user.id }}">Temporary Password</label>
                 <input class="sb-input" id="activate-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-field">
-                <label for="activate-password-confirm-{{ selected_user.id }}">Confirm Password</label>
+                <label for="activate-password-confirm-{{ selected_user.id }}">Confirm Temporary Password</label>
                 <input class="sb-input" id="activate-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-form-actions">
@@ -407,11 +429,11 @@
 
         {% if selected_user.get_account_status() == 'active' %}
           <section class="sb-inspector-section">
-            <h3>Reset Password</h3>
+            <h3>Set Temporary Password</h3>
             <form class="sb-form-grid" method="post" action="{{ url_for('set_temporary_password', user_id=selected_user.id) }}">
               {{ hidden_filters(filter_state) }}
               <div class="sb-field">
-                <label for="temporary-password-{{ selected_user.id }}">New Password</label>
+                <label for="temporary-password-{{ selected_user.id }}">Temporary Password</label>
                 <input class="sb-input" id="temporary-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-field">
@@ -419,7 +441,7 @@
                 <input class="sb-input" id="temporary-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-form-actions">
-                <button class="sb-button-secondary" type="submit">Reset password</button>
+                <button class="sb-button-secondary" type="submit">Set temporary password</button>
               </div>
             </form>
           </section>
@@ -474,6 +496,34 @@
 
 {% block scripts %}
   <script>
+    const passwordModeSelect = document.getElementById("password-mode");
+    const generatedPasswordNote = document.getElementById("generated-password-note");
+    const manualPasswordField = document.getElementById("manual-password-field");
+    const manualPasswordConfirmField = document.getElementById("manual-password-confirm-field");
+    const createPasswordInput = document.getElementById("create-password");
+    const createPasswordConfirmInput = document.getElementById("create-password-confirm");
+
+    if (
+      passwordModeSelect &&
+      generatedPasswordNote &&
+      manualPasswordField &&
+      manualPasswordConfirmField &&
+      createPasswordInput &&
+      createPasswordConfirmInput
+    ) {
+      const syncPasswordMode = () => {
+        const manualMode = passwordModeSelect.value === "manual";
+        generatedPasswordNote.hidden = manualMode;
+        manualPasswordField.hidden = !manualMode;
+        manualPasswordConfirmField.hidden = !manualMode;
+        createPasswordInput.required = manualMode;
+        createPasswordConfirmInput.required = manualMode;
+      };
+
+      passwordModeSelect.addEventListener("change", syncPasswordMode);
+      syncPasswordMode();
+    }
+
     if (window.location.hash === "#selected-user-panel") {
       const panel = document.getElementById("selected-user-panel");
       if (panel) {
