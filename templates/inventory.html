@@ -1,347 +1,214 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Inventory Page</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+{% extends "base_authenticated.html" %}
 
+{% block title %}Inventory Page{% endblock %}
+{% block page_title %}Inventory Page{% endblock %}
+{% block head_extra %}
   <style>
-    html, body, h1, h2, h3, h4, h5 {
-      font-family: "Raleway", sans-serif;
-    }
+    @media (max-width: 760px) {
+      .sb-inventory-table thead {
+        display: none;
+      }
 
-    body {
-      background-color: #f6f3ee;
-      color: #4f4a45;
-    }
+      .sb-inventory-table,
+      .sb-inventory-table tbody,
+      .sb-inventory-table tr,
+      .sb-inventory-table td {
+        display: block;
+        width: 100%;
+      }
 
-    .sb-topbar {
-      background: linear-gradient(to right, #e7d8c3, #f3eadc);
-      color: #5f5a54;
-      border-bottom: 2px solid #d7c3aa;
-    }
+      .sb-inventory-table tr {
+        padding: 14px 12px;
+        border-bottom: 1px solid #ece2d5;
+      }
 
-    .sb-topbar .w3-bar-item {
-      color: #5f5a54 !important;
-      font-weight: 600;
-    }
+      .sb-inventory-table td {
+        padding: 8px 0;
+        border-bottom: 0;
+      }
 
-    .sb-sidebar {
-      background-color: #fcfaf7;
-      color: #5f5a54;
-      border-right: 1px solid #eadfce;
-    }
-
-    .sb-sidebar .w3-bar-item {
-      color: #5f5a54;
-      font-weight: 500;
-    }
-
-    .sb-sidebar .w3-bar-item:hover {
-      background-color: #d7ece8 !important;
-      color: #4c4a46 !important;
-    }
-
-    .sb-active {
-      background-color: #bfe3df !important;
-      color: #4c4a46 !important;
-      font-weight: bold;
-    }
-
-    .card-round {
-      border-radius: 12px;
-    }
-
-    .section-space {
-      margin-top: 18px;
-    }
-
-    .table-scroll {
-      overflow-x: auto;
-    }
-
-    .sb-panel {
-      background-color: #ffffff;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border-radius: 12px;
-    }
-
-    .sb-heading {
-      color: #7c746c;
-      letter-spacing: 0.5px;
-    }
-
-    .sb-subtle {
-      color: #7a746d;
-    }
-
-    .sb-table th {
-      background-color: #bfe3df;
-      color: #4c4a46;
-    }
-
-    .sb-button {
-      background-color: #bfe3df;
-      color: #4c4a46;
-      border: none;
-    }
-
-    .sb-button:hover {
-      background-color: #a9d6d0 !important;
-      color: #3f3b37 !important;
-    }
-
-    .sb-button-warm {
-      background-color: #e8d5bd;
-      color: #4c4a46;
-      border: none;
-    }
-
-    .sb-button-warm:hover {
-      background-color: #dcc3a5 !important;
-      color: #3f3b37 !important;
-    }
-
-    .sb-tag-aqua {
-      background-color: #bfe3df;
-      color: #3f3b37;
-    }
-
-    .sb-tag-beige {
-      background-color: #eadbc8;
-      color: #4c4a46;
-    }
-
-    .sb-tag-soft {
-      background-color: #f0e7dc;
-      color: #4c4a46;
-    }
-
-    .sb-tag-alert {
-      background-color: #f3d7c8;
-      color: #4c4a46;
+      .sb-inventory-table td::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--sb-text-soft);
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
     }
   </style>
-</head>
+{% endblock %}
+{% block page_description %}
+  <p>Track ingredients, packaging supplies, stock levels, and reorder status.</p>
+{% endblock %}
 
-<body class="w3-light-grey">
+{% block content %}
+  {% set summary = namespace(low_stock=0, out_of_stock=0) %}
+  {% for item in all_items %}
+    {% if item.stock_quantity == 0 %}
+      {% set summary.out_of_stock = summary.out_of_stock + 1 %}
+    {% elif item.stock_quantity <= item.reorder_threshold %}
+      {% set summary.low_stock = summary.low_stock + 1 %}
+    {% endif %}
+  {% endfor %}
 
-<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
-  <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
-    <i class="fa fa-bars"></i> Menu
-  </button>
-  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
-</div>
-
-<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
-  <div class="w3-container w3-row">
-    <div class="w3-col s4">
-      <img src="{{ url_for('static', filename='shyneIcon.png') }}" class="w3-circle w3-margin-right" style="width:46px">
-    </div>
-    <div class="w3-col s8 w3-bar">
-      <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
-      <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
-        <button type="submit" class="w3-button sb-logout-button">
-          <i class="fa fa-sign-out"></i> Log out
-        </button>
-      </form>
-    </div>
-  </div>
-  <hr>
-
-  <div class="w3-container">
-    <h5 class="sb-heading">Dashboard</h5>
-  </div>
-
-  <div class="w3-bar-block">
-    <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-hover-black" onclick="w3_close()">
-      <i class="fa fa-remove fa-fw"></i> Close Menu
-    </a>
-
-    <a href="{{ url_for('index') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
-    </a>
-
-    <a href="{{ url_for('orders') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
-    </a>
-
-    <a href="{{ url_for('inventory') }}" class="w3-bar-item w3-button w3-padding sb-active">
-      <i class="fa fa-cubes fa-fw"></i> Inventory
-    </a>
-
-    <a href="{{ url_for('customers') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-users fa-fw"></i> Customers
-    </a>
-
-    <a href="#" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-line-chart fa-fw"></i> Reports
-    </a>
-
-    <a href="#" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-cog fa-fw"></i> Settings
-    </a><br><br>
-  </div>
-</nav>
-
-<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
-
-<div class="w3-main" style="margin-left:300px;margin-top:43px">
-
-  <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-cubes"></i> Inventory Page</b></h3>
-    <p class="sb-subtle">Track ingredients, packaging supplies, stock levels, and reorder status.</p>
-  </header>
-<!--
-  <div class="w3-row-padding w3-margin-bottom">
-    <div class="w3-third">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Inventory Summary</h5>
-        <p><b>Total Inventory Items:</b> 18</p>
-        <p><b>Low Stock Items:</b> 4</p>
-        <p><b>Out of Stock:</b> 1</p>
-      </div>
-    </div>
-
-    <div class="w3-third">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Most Used Materials</h5>
-        <ul class="w3-ul">
-          <li>Shea Butter</li>
-          <li>Vitamin E</li>
-          <li>Jars</li>
-          <li>Label Sheets</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="w3-third">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Quick Actions</h5>
-        <button class="w3-button sb-button w3-margin-bottom w3-block">Add Inventory Item</button>
-        <button class="w3-button sb-button-warm w3-block">Update Stock</button>
-      </div>
-    </div>
-  </div>
--->
-<form method="get" action="{{ url_for('inventory') }}" id="inventoryFilterForm">
-  <div class="w3-container sb-panel w3-padding card-round section-space">
-    <div class="w3-row-padding">
-      <div class="w3-third">
-        <label><b>Search Inventory</b></label>
-        <input class="w3-input w3-border" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
-      </div>
-
-      <div class="w3-third">
-        <label><b>Category</b></label>
-        <select class="w3-select w3-border" name="category">
-          <option value="">All Categories</option>
-          <option value="Ingredients" {% if selected_category == 'Ingredients' %}selected{% endif %}>Ingredients</option>
-          <option value="Packaging" {% if selected_category == 'Packaging' %}selected{% endif %}>Packaging</option>
-          <option value="Labels" {% if selected_category == 'Labels' %}selected{% endif %}>Labels</option>
-          <option value="Supplies" {% if selected_category == 'Supplies' %}selected{% endif %}>Supplies</option>
-        </select>
-      </div>
-
-      <div class="w3-third">
-        <label><b>Stock Status</b></label>
-        <select class="w3-select w3-border" name="stock_status">
-          <option value="">All Statuses</option>
-          <option value="in_stock" {% if selected_stock_status == 'in_stock' %}selected{% endif %}>In Stock</option>
-          <option value="low_stock" {% if selected_stock_status == 'low_stock' %}selected{% endif %}>Low Stock</option>
-          <option value="out_of_stock" {% if selected_stock_status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="w3-margin-top">
-      <button type="submit" class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
-      <a href="{{ url_for('inventory') }}" class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</a>
-    </div>
-  </div>
-</form>
-
-  <div class="w3-container sb-panel w3-padding card-round section-space">
-    <h5 class="sb-heading">Inventory List</h5>
-
-    <div class="table-scroll">
-      <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
-        <tr>
-          <th>Item Name</th>
-          <th>Current Stock</th>
-          <th>Unit</th>
-          <th>Reorder Level</th>
-          <th>Supplier</th>
-          <th>Actions</th>
-        </tr>
-        {% for item in all_items %}
-          <tr>
-            <td>{{ item.name }}</td>
-            <td>{{ item.stock_quantity }}</td>
-            <td>{{ item.unit }}</td>
-            <td>{{ item.reorder_threshold }}</td>
-            <td>{{ item.supplier_name }}</td>
-            <!-- Will implement actions later -->
-            <!--<td>Actions</td>-->
-          </tr>
+  <section class="sb-grid sb-grid-3">
+    <article class="sb-panel">
+      <h2>Inventory Summary</h2>
+      <dl class="sb-meta-list">
+        <div>
+          <dt>Total Inventory Items</dt>
+          <dd>{{ all_items|length }}</dd>
+        </div>
+        <div>
+          <dt>Low Stock Items</dt>
+          <dd>{{ summary.low_stock }}</dd>
+        </div>
+        <div>
+          <dt>Out of Stock</dt>
+          <dd>{{ summary.out_of_stock }}</dd>
+        </div>
+      </dl>
+    </article>
+    <article class="sb-panel">
+      <h2>Filter Snapshot</h2>
+      <dl class="sb-meta-list">
+        <div>
+          <dt>Search</dt>
+          <dd>{{ search_query or "All items" }}</dd>
+        </div>
+        <div>
+          <dt>Category</dt>
+          <dd>{{ selected_category or "All categories" }}</dd>
+        </div>
+        <div>
+          <dt>Stock Status</dt>
+          <dd>
+            {% if selected_stock_status == "in_stock" %}
+              In Stock
+            {% elif selected_stock_status == "low_stock" %}
+              Low Stock
+            {% elif selected_stock_status == "out_of_stock" %}
+              Out of Stock
+            {% else %}
+              All statuses
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </article>
+    <article class="sb-panel">
+      <h2>Reorder Watchlist</h2>
+      <ul class="sb-list">
+        {% for item in all_items if item.stock_quantity <= item.reorder_threshold %}
+          <li>{{ item.name }}</li>
+        {% else %}
+          <li>No ingredients currently need reorder attention.</li>
         {% endfor %}
+      </ul>
+    </article>
+  </section>
+
+  <section class="sb-panel" style="margin-top:16px;">
+    <form class="sb-form-grid" method="get" action="{{ url_for('inventory') }}">
+      <div class="sb-form-row">
+        <div class="sb-field">
+          <label for="inventory-search">Search Inventory</label>
+          <input class="sb-input" id="inventory-search" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
+        </div>
+        <div class="sb-field">
+          <label for="inventory-category">Category</label>
+          <select class="sb-select" id="inventory-category" name="category">
+            <option value="">All Categories</option>
+            <option value="Ingredients" {% if selected_category == "Ingredients" %}selected{% endif %}>Ingredients</option>
+            <option value="Packaging" {% if selected_category == "Packaging" %}selected{% endif %}>Packaging</option>
+            <option value="Labels" {% if selected_category == "Labels" %}selected{% endif %}>Labels</option>
+            <option value="Supplies" {% if selected_category == "Supplies" %}selected{% endif %}>Supplies</option>
+          </select>
+        </div>
+        <div class="sb-field">
+          <label for="inventory-status">Stock Status</label>
+          <select class="sb-select" id="inventory-status" name="stock_status">
+            <option value="">All Statuses</option>
+            <option value="in_stock" {% if selected_stock_status == "in_stock" %}selected{% endif %}>In Stock</option>
+            <option value="low_stock" {% if selected_stock_status == "low_stock" %}selected{% endif %}>Low Stock</option>
+            <option value="out_of_stock" {% if selected_stock_status == "out_of_stock" %}selected{% endif %}>Out of Stock</option>
+          </select>
+        </div>
+      </div>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Apply Filters</button>
+        <a class="sb-button-secondary" href="{{ url_for('inventory') }}">Reset</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="sb-panel">
+    <h2>Inventory List</h2>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-inventory-table">
+        <caption>Ingredient inventory snapshot</caption>
+        <thead>
+          <tr>
+            <th scope="col">Item Name</th>
+            <th scope="col">Category</th>
+            <th scope="col">Current Stock</th>
+            <th scope="col">Unit</th>
+            <th scope="col">Reorder Level</th>
+            <th scope="col">Supplier</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in all_items %}
+            <tr>
+              <td data-label="Item Name">{{ item.name }}</td>
+              <td data-label="Category">{{ item.category or "Uncategorized" }}</td>
+              <td data-label="Current Stock">{{ item.stock_quantity }}</td>
+              <td data-label="Unit">{{ item.unit }}</td>
+              <td data-label="Reorder Level">{{ item.reorder_threshold }}</td>
+              <td data-label="Supplier">{{ item.supplier_name or "Not set" }}</td>
+              <td data-label="Status">
+                {% if item.stock_quantity == 0 %}
+                  <span class="sb-status sb-status-danger">Out of Stock</span>
+                {% elif item.stock_quantity <= item.reorder_threshold %}
+                  <span class="sb-status sb-status-pending">Low Stock</span>
+                {% else %}
+                  <span class="sb-status sb-status-active">In Stock</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="sb-empty">
+                No inventory items match the current filters.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
       </table>
     </div>
+  </section>
+
+  <div class="sb-grid sb-grid-2" style="margin-top:16px;">
+    <section class="sb-panel">
+      <h2>Low Stock Alerts</h2>
+      <ul class="sb-list">
+        {% for item in all_items if item.stock_quantity <= item.reorder_threshold %}
+          {% if item.stock_quantity == 0 %}
+            <li>{{ item.name }} is out of stock.</li>
+          {% else %}
+            <li>{{ item.name }} is below reorder level.</li>
+          {% endif %}
+        {% else %}
+          <li>No low-stock alerts for the current filter set.</li>
+        {% endfor %}
+      </ul>
+    </section>
+    <section class="sb-panel">
+      <h2>Page Purpose</h2>
+      <p class="sb-section-note">
+        This page keeps ingredient, packaging, and supplier context visible for planning and fulfillment while technical edits remain in the protected admin console.
+      </p>
+    </section>
   </div>
-
-<!--
-  <div class="w3-row-padding w3-margin-top w3-margin-bottom">
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Low Stock Alerts</h5>
-        <ul class="w3-ul">
-          <li>Vitamin E is below reorder level.</li>
-          <li>Label Sheets need reordered soon.</li>
-          <li>Rose Fragrance Oil is out of stock.</li>
-        </ul>
-      </div>
-    </div>
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Page Purpose</h5>
-        <p>
-          This page is meant to help the stakeholder keep track of materials and supplies used
-        </p>
-        <p>
-          In full version this page could be connected to the Flask backend and database so inventory updates
-        </p>
-      </div>
-    </div>
-  </div>
-  -->
-</div>
-
-<script>
-  var mySidebar = document.getElementById("mySidebar");
-  var overlayBg = document.getElementById("myOverlay");
-
-  function w3_open() {
-    if (mySidebar.style.display === "block") {
-      mySidebar.style.display = "none";
-      overlayBg.style.display = "none";
-    } else {
-      mySidebar.style.display = "block";
-      overlayBg.style.display = "block";
-    }
-  }
-
-  function w3_close() {
-    mySidebar.style.display = "none";
-    overlayBg.style.display = "none";
-  }
-</script>
-
-</body>
-</html>
+{% endblock %}
