@@ -312,7 +312,7 @@ def is_safe_next_target(target):
     candidate = target.strip()
     normalized_candidate = candidate.replace("\\", "/")
 
-    if not candidate.startswith("/") or normalized_candidate.startswith("//"):
+    if not normalized_candidate.startswith("/") or normalized_candidate.startswith("//"):
         return False
 
     parts = urlparse(normalized_candidate)
@@ -320,8 +320,13 @@ def is_safe_next_target(target):
 
 
 def get_safe_next_target(target):
-    if is_safe_next_target(target):
-        return target.strip()
+    if not target:
+        return ""
+
+    candidate = target.strip()
+    normalized_candidate = candidate.replace("\\", "/")
+    if is_safe_next_target(normalized_candidate):
+        return normalized_candidate
     return ""
 
 
@@ -1398,21 +1403,7 @@ def login():
                     if next_url:
                         return redirect(url_for("change_password", next=next_url))
                     return redirect(url_for("change_password"))
-                next_target = request.form.get("next") or request.args.get("next") or ""
-                next_target = next_target.strip()
-                normalized_next_target = next_target.replace("\\", "/")
-                parsed_next_target = urlparse(normalized_next_target)
-
-                if (
-                    next_target
-                    and next_target.startswith("/")
-                    and not normalized_next_target.startswith("//")
-                    and not parsed_next_target.scheme
-                    and not parsed_next_target.netloc
-                ):
-                    return redirect(normalized_next_target)
-
-                return redirect(url_for("index"))
+                return redirect(next_url or url_for("index"))
             else:
                 if admin_user:
                     admin_user.register_failed_login(now)

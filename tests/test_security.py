@@ -160,6 +160,13 @@ def test_internal_next_targets_with_query_params_are_allowed(client, admin_user,
     assert response.headers["Location"].endswith("/orders?status=open")
 
 
+def test_backslash_next_targets_are_normalized_when_safe(client, admin_user, login):
+    response = login(client, next_url="\\orders?status=open")
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders?status=open")
+
+
 def test_authenticated_users_are_redirected_away_from_login(
     client, admin_user, login
 ):
@@ -431,6 +438,76 @@ def test_forced_password_change_clears_requirement_and_restores_access(
         refreshed_user = db.session.get(AdminUser, user.id)
         assert refreshed_user.requires_password_change() is False
         assert refreshed_user.check_password("BrandNewPassw0rd!") is True
+
+
+@pytest.mark.parametrize(
+    "next_url",
+    [
+        "//evil.example/phish",
+        "https://evil.example/phish",
+        "\\\\evil.example/phish",
+    ],
+)
+def test_forced_password_change_rejects_unsafe_next_targets(
+    client, admin_factory, login, next_url
+):
+    admin_factory(
+        email="temp-unsafe@shynebeauty.com",
+        full_name="Temp Unsafe",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(
+        client,
+        email="temp-unsafe@shynebeauty.com",
+        password="TempPassw0rd!",
+    )
+
+    response = client.post(
+        f"/change-password?next={next_url}",
+        data={
+            "next": next_url,
+            "password": "BrandNewPassw0rd!",
+            "password_confirmation": "BrandNewPassw0rd!",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+
+def test_forced_password_change_normalizes_safe_backslash_next_targets(
+    client, admin_factory, login
+):
+    admin_factory(
+        email="temp-safe@shynebeauty.com",
+        full_name="Temp Safe",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(
+        client,
+        email="temp-safe@shynebeauty.com",
+        password="TempPassw0rd!",
+    )
+
+    response = client.post(
+        "/change-password?next=\\orders?status=open",
+        data={
+            "next": "\\orders?status=open",
+            "password": "BrandNewPassw0rd!",
+            "password_confirmation": "BrandNewPassw0rd!",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders?status=open")
 
 
 def test_superadmin_is_denied_admin_console_access(client, admin_user, login):
