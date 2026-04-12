@@ -330,6 +330,13 @@ def get_safe_next_target(target):
     return ""
 
 
+def redirect_to_safe_next(target, *, fallback_endpoint="index"):
+    safe_target = get_safe_next_target(target)
+    if safe_target:
+        return redirect(safe_target)
+    return redirect(url_for(fallback_endpoint))
+
+
 def current_request_next_target():
     if request.query_string:
         return f"{request.path}?{request.query_string.decode('utf-8')}"
@@ -1403,7 +1410,10 @@ def login():
                     if next_url:
                         return redirect(url_for("change_password", next=next_url))
                     return redirect(url_for("change_password"))
-                return redirect(next_url or url_for("index"))
+                return redirect_to_safe_next(
+                    request.form.get("next") or request.args.get("next"),
+                    fallback_endpoint="index",
+                )
             else:
                 if admin_user:
                     admin_user.register_failed_login(now)
@@ -1461,7 +1471,10 @@ def change_password():
             )
             db.session.commit()
             flash("Password updated.", "success")
-            return redirect(next_url or url_for("index"))
+            return redirect_to_safe_next(
+                request.form.get("next") or request.args.get("next"),
+                fallback_endpoint="index",
+            )
 
     return render_template("change_password.html", next_url=next_url)
 
