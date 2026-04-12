@@ -114,6 +114,7 @@ def admin_factory(app):
             password="correct-horse-battery-staple",
             role=ROLE_STAFF_OPERATOR,
             account_status=ACCOUNT_STATUS_ACTIVE,
+            must_change_password=False,
             failed_login_count=0,
             locked_until=None,
             last_login_at=None,
@@ -141,6 +142,7 @@ def admin_factory(app):
                 user.is_active = True
             if account_status == ACCOUNT_STATUS_INVITED:
                 user.invited_by_user_id = 1
+            user.must_change_password = must_change_password
             if permission_overrides is not None:
                 user.set_permission_overrides(permission_overrides)
             db.session.add(user)

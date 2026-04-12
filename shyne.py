@@ -1,5 +1,7 @@
 import json
 import os
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -201,7 +203,9 @@ ADMIN_ACCESS_EVENT_INVITE_CREATED = "invite.created"
 ADMIN_ACCESS_EVENT_INVITE_RESENT = "invite.resent"
 ADMIN_ACCESS_EVENT_INVITE_CANCELLED = "invite.cancelled"
 ADMIN_ACCESS_EVENT_ACCOUNT_ACTIVATED = "account.activated"
+ADMIN_ACCESS_EVENT_ACCOUNT_CREATED = "account.created"
 ADMIN_ACCESS_EVENT_PASSWORD_RESET = "account.password_reset"
+ADMIN_ACCESS_EVENT_PASSWORD_CHANGED = "account.password_changed"
 ADMIN_ACCESS_EVENT_ROLE_CHANGED = "account.role_changed"
 ADMIN_ACCESS_EVENT_STATUS_CHANGED = "account.status_changed"
 ADMIN_ACCESS_EVENT_ACCESS_DENIED = "access.denied"
@@ -214,6 +218,7 @@ SECURITY_HEADERS = {
 }
 NO_STORE_ENDPOINTS = {
     "index",
+    "change_password",
     "login",
     "logout",
     "orders",
@@ -326,6 +331,11 @@ def current_request_next_target():
     return request.path
 
 
+def generate_temporary_password(length=16):
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 def slug_to_role_label(value):
     if value not in ROLE_SLUG_MAP:
         raise click.ClickException(
@@ -435,6 +445,10 @@ def ensure_admin_user_access_columns():
         "last_role_changed_at": "ALTER TABLE admin_users ADD COLUMN last_role_changed_at DATETIME",
         "last_role_changed_by_user_id": "ALTER TABLE admin_users ADD COLUMN last_role_changed_by_user_id INTEGER",
         "permission_overrides_json": "ALTER TABLE admin_users ADD COLUMN permission_overrides_json TEXT",
+        "must_change_password": (
+            "ALTER TABLE admin_users "
+            "ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"
+        ),
     }
 
     with auth_engine.begin() as connection:
@@ -492,6 +506,7 @@ class AdminUser(UserMixin, db.Model):
     last_role_changed_at = db.Column(db.DateTime(timezone=True))
     last_role_changed_by_user_id = db.Column(db.Integer)
     permission_overrides_json = db.Column(db.Text)
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     failed_login_count = db.Column(db.Integer, nullable=False, default=0)
     locked_until = db.Column(db.DateTime(timezone=True))
     last_login_at = db.Column(db.DateTime(timezone=True))
@@ -617,6 +632,9 @@ class AdminUser(UserMixin, db.Model):
     def reset_login_state(self):
         self.failed_login_count = 0
         self.locked_until = None
+
+    def requires_password_change(self):
+        return bool(self.must_change_password)
 
     def display_status(self, now=None):
         if self.is_locked(now):
@@ -883,6 +901,7 @@ def serialize_admin_user_snapshot(admin_user, *, now=None):
         "display_status": admin_user.display_status(comparison_time),
         "is_active": bool(admin_user.is_active),
         "is_locked": admin_user.is_locked(comparison_time),
+        "must_change_password": admin_user.requires_password_change(),
         "permission_overrides": admin_user.get_permission_overrides(),
     }
 
@@ -968,6 +987,14 @@ def role_scope_summary(role_label):
     }.get(role_label, "Operational access")
 
 
+def password_state_label(admin_user):
+    return (
+        "Temporary password; must change at next login"
+        if admin_user.requires_password_change()
+        else "Ready for normal sign-in"
+    )
+
+
 def resolve_actor_name(user_id):
     if not user_id:
         return "System"
@@ -975,6 +1002,12 @@ def resolve_actor_name(user_id):
     if admin_user is None:
         return "Unknown user"
     return admin_user.full_name or admin_user.email
+
+
+def force_password_change_allowed_endpoint(endpoint):
+    if endpoint is None:
+        return True
+    return endpoint in {"change_password", "logout", "static"}
 
 
 def parse_last_login_state(admin_user, *, now=None):
@@ -1213,6 +1246,22 @@ def ensure_request_auth_schema_compatibility():
     return None
 
 
+@app.before_request
+def enforce_password_change():
+    if not current_user.is_authenticated:
+        return None
+    if not current_user.requires_password_change():
+        return None
+    if force_password_change_allowed_endpoint(request.endpoint):
+        return None
+
+    next_target = current_request_next_target()
+    safe_next = get_safe_next_target(next_target)
+    if safe_next:
+        return redirect(url_for("change_password", next=safe_next))
+    return redirect(url_for("change_password"))
+
+
 @app.after_request
 def add_security_headers(response):
     for header_name, header_value in SECURITY_HEADERS.items():
@@ -1302,6 +1351,8 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
+        if current_user.requires_password_change():
+            return redirect(url_for("change_password"))
         return redirect(url_for("index"))
 
     form_data = {"email": "", "remember_me": False}
@@ -1343,6 +1394,10 @@ def login():
 
                 session.clear()
                 login_user(admin_user, remember=remember_me)
+                if admin_user.requires_password_change():
+                    if next_url:
+                        return redirect(url_for("change_password", next=next_url))
+                    return redirect(url_for("change_password"))
                 next_target = request.form.get("next") or request.args.get("next") or ""
                 next_target = next_target.strip()
                 normalized_next_target = next_target.replace("\\", "/")
@@ -1371,6 +1426,53 @@ def login():
         show_dev_test_admin_hint=dev_test_admin_enabled(),
         dev_test_admin_seeded=dev_test_admin_seeded(),
     )
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if not current_user.is_authenticated:
+        return login_manager.unauthorized()
+    if not current_user.requires_password_change():
+        return redirect(url_for("index"))
+
+    next_url = get_safe_next_target(request.args.get("next"))
+    if request.method == "POST":
+        next_url = get_safe_next_target(
+            request.form.get("next") or request.args.get("next")
+        )
+        password = request.form.get("password") or ""
+        password_confirmation = request.form.get("password_confirmation") or ""
+
+        if not password:
+            flash("New password is required.", "error")
+        elif password != password_confirmation:
+            flash("Passwords must match.", "error")
+        elif current_user.check_password(password):
+            flash("Choose a password different from the temporary password.", "error")
+        else:
+            comparison_time = utc_now()
+            before_state = serialize_admin_user_snapshot(
+                current_user, now=comparison_time
+            )
+            current_user.set_password(password)
+            current_user.must_change_password = False
+            current_user.reset_login_state()
+            log_admin_access_event(
+                actor=current_user,
+                target=current_user,
+                event_type=ADMIN_ACCESS_EVENT_PASSWORD_CHANGED,
+                outcome=ADMIN_ACCESS_EVENT_OUTCOME_SUCCESS,
+                before_state=before_state,
+                after_state=serialize_admin_user_snapshot(
+                    current_user, now=comparison_time
+                ),
+                note="Forced password change completed.",
+            )
+            db.session.commit()
+            flash("Password updated.", "success")
+            return redirect(next_url or url_for("index"))
+
+    return render_template("change_password.html", next_url=next_url)
 
 
 @app.route("/orders")
@@ -1562,6 +1664,7 @@ def users():
         ),
         comparison_time=comparison_time,
         permission_labels=summarize_permissions,
+        password_state_label=password_state_label,
         role_scope_summary=role_scope_summary,
         parse_last_login_state=parse_last_login_state,
         resolve_actor_name=resolve_actor_name,
@@ -1576,12 +1679,25 @@ def invite_user():
     email = normalize_email(request.form.get("email"))
     full_name = (request.form.get("full_name") or "").strip()
     role = request.form.get("role")
+    password_mode = (request.form.get("password_mode") or "generated").strip()
+    password = request.form.get("password") or ""
+    password_confirmation = request.form.get("password_confirmation") or ""
     if not email:
         flash("Email is required.", "error")
         return users_redirect_response(show_invite=True, **filter_state)
     if role not in BUSINESS_ROLE_CHOICES:
         flash("Select one of the fixed business roles.", "error")
         return users_redirect_response(show_invite=True, **filter_state)
+    if password_mode not in {"generated", "manual"}:
+        flash("Select a temporary password mode.", "error")
+        return users_redirect_response(show_invite=True, **filter_state)
+    if password_mode == "manual":
+        if not password:
+            flash("Temporary password is required.", "error")
+            return users_redirect_response(show_invite=True, **filter_state)
+        if password != password_confirmation:
+            flash("Passwords must match.", "error")
+            return users_redirect_response(show_invite=True, **filter_state)
     existing_user = AdminUser.query.filter_by(email=email).first()
     if existing_user is not None:
         flash("An account with that email already exists.", "error")
@@ -1592,24 +1708,33 @@ def invite_user():
         email=email,
         full_name=full_name or None,
     )
+    temporary_password = (
+        generate_temporary_password() if password_mode == "generated" else password
+    )
+    created_user.set_password(temporary_password)
+    created_user.must_change_password = True
     created_user.set_role(role, actor=current_user, now=comparison_time)
     created_user.set_account_status(
-        ACCOUNT_STATUS_INVITED, actor=current_user, now=comparison_time
+        ACCOUNT_STATUS_ACTIVE, actor=current_user, now=comparison_time
     )
-    created_user.invited_at = comparison_time
-    created_user.invited_by_user_id = current_user.id
     created_user.reset_login_state()
     db.session.add(created_user)
     db.session.flush()
     log_admin_access_event(
         actor=current_user,
         target=created_user,
-        event_type=ADMIN_ACCESS_EVENT_INVITE_CREATED,
+        event_type=ADMIN_ACCESS_EVENT_ACCOUNT_CREATED,
         outcome=ADMIN_ACCESS_EVENT_OUTCOME_SUCCESS,
         after_state=serialize_admin_user_snapshot(created_user, now=comparison_time),
+        note=f"Temporary password mode: {password_mode}.",
     )
     db.session.commit()
-    flash("Invite created successfully.", "success")
+    flash("User created with a temporary password.", "success")
+    if password_mode == "generated":
+        flash(
+            f"Temporary password (shown once): {temporary_password}",
+            "info",
+        )
     return users_redirect_response(
         selected_user_id=created_user.id,
         show_invite=False,
@@ -1640,6 +1765,7 @@ def activate_user(user_id):
     comparison_time = utc_now()
     before_state = serialize_admin_user_snapshot(target_user, now=comparison_time)
     target_user.set_password(password)
+    target_user.must_change_password = True
     target_user.set_account_status(
         ACCOUNT_STATUS_ACTIVE, actor=current_user, now=comparison_time
     )
@@ -1653,7 +1779,7 @@ def activate_user(user_id):
         after_state=serialize_admin_user_snapshot(target_user, now=comparison_time),
     )
     db.session.commit()
-    flash("Account activated.", "success")
+    flash("Account activated with a temporary password.", "success")
     return users_redirect_response(selected_user_id=user_id, **filter_state)
 
 
@@ -1844,6 +1970,7 @@ def set_temporary_password(user_id):
     comparison_time = utc_now()
     before_state = serialize_admin_user_snapshot(target_user, now=comparison_time)
     target_user.set_password(password)
+    target_user.must_change_password = True
     target_user.reset_login_state()
     log_admin_access_event(
         actor=current_user,
@@ -1854,7 +1981,7 @@ def set_temporary_password(user_id):
         after_state=serialize_admin_user_snapshot(target_user, now=comparison_time),
     )
     db.session.commit()
-    flash("Password reset successfully.", "success")
+    flash("Temporary password set. The user must change it at next login.", "success")
     return users_redirect_response(selected_user_id=user_id, **filter_state)
 
 

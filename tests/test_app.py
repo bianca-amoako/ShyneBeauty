@@ -156,6 +156,7 @@ def test_routes_are_registered(app):
     assert "/customers" in routes
     assert "/inventory" in routes
     assert "/users" in routes
+    assert "/change-password" in routes
     assert "/tasks" in routes
     assert "/logout" in routes
 
@@ -197,6 +198,7 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
         "invited_at",
         "invited_by_user_id",
         "activated_at",
+        "must_change_password",
         "permission_overrides_json",
     }
 
