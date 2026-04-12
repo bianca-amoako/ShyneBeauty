@@ -199,7 +199,7 @@
     <h3 class="sb-heading"><b><i class="fa fa-cubes"></i> Inventory Page</b></h3>
     <p class="sb-subtle">Track ingredients, packaging supplies, stock levels, and reorder status.</p>
   </header>
-
+<!--
   <div class="w3-row-padding w3-margin-bottom">
     <div class="w3-third">
       <div class="w3-container sb-panel w3-padding card-round">
@@ -230,41 +230,43 @@
       </div>
     </div>
   </div>
-
+-->
+<form method="get" action="{{ url_for('inventory') }}" id="inventoryFilterForm">
   <div class="w3-container sb-panel w3-padding card-round section-space">
     <div class="w3-row-padding">
       <div class="w3-third">
         <label><b>Search Inventory</b></label>
-        <input class="w3-input w3-border" type="text" placeholder="Search by item name">
+        <input class="w3-input w3-border" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
       </div>
 
       <div class="w3-third">
         <label><b>Category</b></label>
-        <select class="w3-select w3-border">
+        <select class="w3-select w3-border" name="category">
           <option value="">All Categories</option>
-          <option>Ingredients</option>
-          <option>Packaging</option>
-          <option>Labels</option>
-          <option>Supplies</option>
+          <option value="Ingredients" {% if selected_category == 'Ingredients' %}selected{% endif %}>Ingredients</option>
+          <option value="Packaging" {% if selected_category == 'Packaging' %}selected{% endif %}>Packaging</option>
+          <option value="Labels" {% if selected_category == 'Labels' %}selected{% endif %}>Labels</option>
+          <option value="Supplies" {% if selected_category == 'Supplies' %}selected{% endif %}>Supplies</option>
         </select>
       </div>
 
       <div class="w3-third">
         <label><b>Stock Status</b></label>
-        <select class="w3-select w3-border">
+        <select class="w3-select w3-border" name="stock_status">
           <option value="">All Statuses</option>
-          <option>In Stock</option>
-          <option>Low Stock</option>
-          <option>Out of Stock</option>
+          <option value="in_stock" {% if selected_stock_status == 'in_stock' %}selected{% endif %}>In Stock</option>
+          <option value="low_stock" {% if selected_stock_status == 'low_stock' %}selected{% endif %}>Low Stock</option>
+          <option value="out_of_stock" {% if selected_stock_status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
         </select>
       </div>
     </div>
 
     <div class="w3-margin-top">
-      <button class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
-      <button class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</button>
+      <button type="submit" class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
+      <a href="{{ url_for('inventory') }}" class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</a>
     </div>
   </div>
+</form>
 
   <div class="w3-container sb-panel w3-padding card-round section-space">
     <h5 class="sb-heading">Inventory List</h5>
@@ -273,82 +275,28 @@
       <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
         <tr>
           <th>Item Name</th>
-          <th>Category</th>
           <th>Current Stock</th>
           <th>Unit</th>
           <th>Reorder Level</th>
-          <th>Status</th>
+          <th>Supplier</th>
           <th>Actions</th>
         </tr>
-
-        <tr>
-          <td>Shea Butter</td>
-          <td>Ingredient</td>
-          <td>12</td>
-          <td>lbs</td>
-          <td>10</td>
-          <td><span class="w3-tag sb-tag-aqua">In Stock</span></td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>Vitamin E</td>
-          <td>Ingredient</td>
-          <td>3</td>
-          <td>bottles</td>
-          <td>5</td>
-          <td><span class="w3-tag sb-tag-beige">Low Stock</span></td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>Body Butter Jars</td>
-          <td>Packaging</td>
-          <td>8</td>
-          <td>boxes</td>
-          <td>6</td>
-          <td><span class="w3-tag sb-tag-aqua">In Stock</span></td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>Label Sheets</td>
-          <td>Labels</td>
-          <td>2</td>
-          <td>packs</td>
-          <td>4</td>
-          <td><span class="w3-tag sb-tag-beige">Low Stock</span></td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
-
-        <tr>
-          <td>Rose Fragrance Oil</td>
-          <td>Ingredient</td>
-          <td>0</td>
-          <td>bottles</td>
-          <td>2</td>
-          <td><span class="w3-tag sb-tag-alert">Out of Stock</span></td>
-          <td>
-            <button class="w3-button w3-small sb-button">View</button>
-            <button class="w3-button w3-small sb-button-warm">Edit</button>
-          </td>
-        </tr>
+        {% for item in all_items %}
+          <tr>
+            <td>{{ item.name }}</td>
+            <td>{{ item.stock_quantity }}</td>
+            <td>{{ item.unit }}</td>
+            <td>{{ item.reorder_threshold }}</td>
+            <td>{{ item.supplier_name }}</td>
+            <!-- Will implement actions later -->
+            <!--<td>Actions</td>-->
+          </tr>
+        {% endfor %}
       </table>
     </div>
   </div>
 
+<!--
   <div class="w3-row-padding w3-margin-top w3-margin-bottom">
     <div class="w3-half">
       <div class="w3-container sb-panel w3-padding card-round">
@@ -360,7 +308,6 @@
         </ul>
       </div>
     </div>
-
     <div class="w3-half">
       <div class="w3-container sb-panel w3-padding card-round">
         <h5 class="sb-heading">Page Purpose</h5>
@@ -373,7 +320,7 @@
       </div>
     </div>
   </div>
-
+  -->
 </div>
 
 <script>
