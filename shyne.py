@@ -325,7 +325,13 @@ def get_safe_next_target(target):
 
     candidate = target.strip()
     normalized_candidate = candidate.replace("\\", "/")
-    if is_safe_next_target(normalized_candidate):
+    parsed = urlparse(normalized_candidate)
+    if (
+        normalized_candidate.startswith("/")
+        and not normalized_candidate.startswith("//")
+        and not parsed.scheme
+        and not parsed.netloc
+    ):
         return normalized_candidate
     return ""
 
