@@ -1606,6 +1606,11 @@ def add_customer():
 @login_required
 def add_order():
     return render_template("addOrder.html")
+
+@app.route("/add-inventory")
+@login_required
+def add_inventory():
+    return render_template("addInventoryItem.html")
     
 @app.route("/users")
 @require_permission(
