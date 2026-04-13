@@ -1325,6 +1325,11 @@ def inject_current_admin_label():
                 "visible": has_permission(PERMISSION_CUSTOMERS_VIEW),
             },
             {
+                "endpoint": "add_new",
+                "label": "Add New",
+                "visible": True,
+            },
+            {
                 "endpoint": "tasks",
                 "label": "Tasks",
                 "visible": has_permission(PERMISSION_TASKS_VIEW),
