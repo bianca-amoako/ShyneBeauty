@@ -1618,6 +1618,11 @@ def add_order():
 @login_required
 def add_inventory():
     return render_template("addInventoryItem.html")
+
+@app.route("/add-product")
+@login_required
+def add_product():
+    return render_template("addProduct.html")
     
 @app.route("/users")
 @require_permission(
