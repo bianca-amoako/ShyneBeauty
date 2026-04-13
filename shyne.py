@@ -1602,6 +1602,11 @@ def add_new():
 def add_customer():
     return render_template("addCustomer.html")
 
+@app.route("/add-order")
+@login_required
+def add_order():
+    return render_template("addOrder.html")
+    
 @app.route("/users")
 @require_permission(
     PERMISSION_USERS_MANAGE,
