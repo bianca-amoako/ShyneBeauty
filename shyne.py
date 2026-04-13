@@ -1597,6 +1597,11 @@ def inventory():
 def add_new():
     return render_template("addNew.html")
 
+@app.route("/add-customer")
+@login_required
+def add_customer():
+    return render_template("addCustomer.html")
+
 @app.route("/users")
 @require_permission(
     PERMISSION_USERS_MANAGE,
