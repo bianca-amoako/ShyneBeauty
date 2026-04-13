@@ -1,336 +1,114 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Manage Orders</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+{% extends "base_authenticated.html" %}
 
-  <style>
-    html, body, h1, h2, h3, h4, h5 {
-      font-family: "Raleway", sans-serif;
-    }
+{% block title %}Manage Orders{% endblock %}
+{% block page_title %}Manage Orders{% endblock %}
+{% block page_description %}
+  <p>Track orders from Fiverr, Square, Google Sheets, and manual internal entry.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button" href="{{ url_for('add_order') }}">Review add-order layout</a>
+  <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
+{% endblock %}
 
-    body {
-      background-color: #f6f3ee;
-      color: #4f4a45;
-    }
+{% block content %}
+  <section class="sb-panel">
+    <form class="sb-form-grid" method="get" action="{{ url_for('orders') }}">
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="orders-search" type="text" name="search" placeholder=" " value="{{ search_query or '' }}">
+          <label for="orders-search">Search Orders</label>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="orders-source">Source</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="orders-source" name="source">
+              <option value="">All Sources</option>
+              <option value="Fiverr" {% if selected_source == 'Fiverr' %}selected{% endif %}>Fiverr</option>
+              <option value="Square" {% if selected_source == 'Square' %}selected{% endif %}>Square</option>
+              <option value="Google Sheets" {% if selected_source == 'Google Sheets' %}selected{% endif %}>Google Sheets</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="orders-status">Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="orders-status" name="status">
+              <option value="">All Statuses</option>
+              <option value="New" {% if selected_status == 'New' %}selected{% endif %}>New</option>
+              <option value="In Progress" {% if selected_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+              <option value="Waiting for Ingredients" {% if selected_status == 'Waiting for Ingredients' %}selected{% endif %}>Waiting for Ingredients</option>
+              <option value="Packed" {% if selected_status == 'Packed' %}selected{% endif %}>Packed</option>
+              <option value="Shipped" {% if selected_status == 'Shipped' %}selected{% endif %}>Shipped</option>
+              <option value="Completed" {% if selected_status == 'Completed' %}selected{% endif %}>Completed</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Apply filters</button>
+        <a class="sb-button-secondary" href="{{ url_for('orders') }}">Reset</a>
+      </div>
+    </form>
+  </section>
 
-    .sb-topbar {
-      background: linear-gradient(to right, #e7d8c3, #f3eadc);
-      color: #5f5a54;
-      border-bottom: 2px solid #d7c3aa;
-    }
-
-    .sb-topbar .w3-bar-item {
-      color: #5f5a54 !important;
-      font-weight: 600;
-    }
-
-    .sb-sidebar {
-      background-color: #fcfaf7;
-      color: #5f5a54;
-      border-right: 1px solid #eadfce;
-    }
-
-    .sb-sidebar .w3-bar-item {
-      color: #5f5a54;
-      font-weight: 500;
-    }
-
-    .sb-sidebar .w3-bar-item:hover {
-      background-color: #d7ece8 !important;
-      color: #4c4a46 !important;
-    }
-
-    .sb-active {
-      background-color: #bfe3df !important;
-      color: #4c4a46 !important;
-      font-weight: bold;
-    }
-
-    .card-round {
-      border-radius: 12px;
-    }
-
-    .section-space {
-      margin-top: 18px;
-    }
-
-    .table-scroll {
-      overflow-x: auto;
-    }
-
-    .sb-panel {
-      background-color: #ffffff;
-      color: #4f4a45;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border-radius: 12px;
-    }
-
-    .sb-heading {
-      color: #7c746c;
-      letter-spacing: 0.5px;
-    }
-
-    .sb-subtle {
-      color: #7a746d;
-    }
-
-    .sb-table th {
-      background-color: #bfe3df;
-      color: #4c4a46;
-    }
-
-    .sb-button {
-      background-color: #bfe3df;
-      color: #4c4a46;
-      border: none;
-    }
-
-    .sb-button:hover {
-      background-color: #a9d6d0 !important;
-      color: #3f3b37 !important;
-    }
-
-    .sb-button-warm {
-      background-color: #e8d5bd;
-      color: #4c4a46;
-      border: none;
-    }
-
-    .sb-button-warm:hover {
-      background-color: #dcc3a5 !important;
-      color: #3f3b37 !important;
-    }
-
-    .sb-tag-aqua {
-      background-color: #bfe3df;
-      color: #3f3b37;
-    }
-
-    .sb-tag-beige {
-      background-color: #eadbc8;
-      color: #4c4a46;
-    }
-
-    .sb-tag-soft {
-      background-color: #f0e7dc;
-      color: #4c4a46;
-    }
-
-    .sb-logout-form {
-      margin-top: 12px;
-    }
-
-    .sb-logout-button {
-      background-color: #f0e7dc;
-      color: #4c4a46;
-      border: none;
-      border-radius: 999px;
-      padding: 8px 14px;
-    }
-
-    .sb-logout-button:hover {
-      background-color: #e8d5bd !important;
-      color: #3f3b37 !important;
-    }
-  </style>
-</head>
-
-<body class="w3-light-grey">
-
-<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
-  <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
-    <i class="fa fa-bars"></i> Menu
-  </button>
-  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
-</div>
-
-<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
-  <div class="w3-container w3-row">
-    <div class="w3-col s4">
-      <img src="{{ url_for('static', filename='shyneIcon.png') }}" class="w3-circle w3-margin-right" style="width:46px">
-    </div>
-    <div class="w3-col s8 w3-bar">
-      <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
-      <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
-        <button type="submit" class="w3-button sb-logout-button">
-          <i class="fa fa-sign-out"></i> Log out
-        </button>
-      </form>
-    </div>
-  </div>
-  <hr>
-
-  <div class="w3-container">
-    <h5 class="sb-heading">Dashboard</h5>
-  </div>
-
-  <div class="w3-bar-block">
-    <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-hover-black" onclick="w3_close()">
-      <i class="fa fa-remove fa-fw"></i> Close Menu
-    </a>
-
-    <a href="{{ url_for('index') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
-    </a>
-
-    <a href="{{ url_for('orders') }}" class="w3-bar-item w3-button w3-padding sb-active">
-      <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
-    </a>
-
-    <a href="{{ url_for('inventory') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-cubes fa-fw"></i> Inventory
-    </a>
-
-
-    <a href="{{ url_for('customers') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-users fa-fw"></i> Customers
-    </a>
-
-    <a href="{{ url_for('add_new') }}" class="w3-bar-item w3-button w3-padding">
-  <i class="fa fa-plus-circle fa-fw"></i> Add New
-    </a>
-    <br><br>
-  </div>
-</nav>
-
-<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
-
-<div class="w3-main" style="margin-left:300px;margin-top:43px">
-
-  <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-shopping-bag"></i> Manage Orders</b></h3>
-    <p class="sb-subtle">Track customer orders from Fiverr, Square, Google Sheets, and manual entries.</p>
-  </header>
-
-  <div class="w3-container sb-panel w3-padding card-round section-space">
-<form method="get" action="{{ url_for('orders') }}" id="filterForm">
-  <div class="w3-row-padding">
-    <div class="w3-third">
-      <label><b>Search Orders</b></label>
-      <input class="w3-input w3-border" type="text" name="search" placeholder="Search by order ID, customer, or product" value="{{ search_query or '' }}">
-    </div>
-
-    <div class="w3-third">
-      <label><b>Source</b></label>
-      <select class="w3-select w3-border" name="source">
-        <option value="">All Sources</option>
-        <option value="Fiverr" {% if selected_source == 'Fiverr' %}selected{% endif %}>Fiverr</option>
-        <option value="Square" {% if selected_source == 'Square' %}selected{% endif %}>Square</option>
-        <option value="Google Sheets" {% if selected_source == 'Google Sheets' %}selected{% endif %}>Google Sheets</option>
-      </select>
-    </div>
-
-  <div class="w3-third">
-  <label><b>Status</b></label>
-  <select class="w3-select w3-border" name="status">
-    <option value="">All Statuses</option>
-    <option value="New" {% if selected_status == 'New' %}selected{% endif %}>New</option>
-    <option value="In Progress" {% if selected_status == 'In Progress' %}selected{% endif %}>In Progress</option>
-    <option value="Waiting for Ingredients" {% if selected_status == 'Waiting for Ingredients' %}selected{% endif %}>Waiting for Ingredients</option>
-    <option value="Packed" {% if selected_status == 'Packed' %}selected{% endif %}>Packed</option>
-    <option value="Shipped" {% if selected_status == 'Shipped' %}selected{% endif %}>Shipped</option>
-    <option value="Completed" {% if selected_status == 'Completed' %}selected{% endif %}>Completed</option>
-  </select>
-  </div>
-  </div>
-
-  <div class="w3-margin-top">
-    <button type="submit" class="w3-button sb-button"><i class="fa fa-search"></i> Apply Filters</button>
-    <a href="{{ url_for('orders') }}" class="w3-button w3-light-grey"><i class="fa fa-refresh"></i> Reset</a>
-    <button type="button" class="w3-button sb-button-warm w3-right" onclick="openAddOrderModal()"><i class="fa fa-plus"></i> Add Order</button>
-  </div>
-</form>
-  </div>
-
-  <div class="w3-container sb-panel w3-padding card-round section-space">
-    <h5 class="sb-heading">Order List</h5>
-
-    <div class="table-scroll">
-      <table class="w3-table w3-striped w3-bordered w3-hoverable sb-table">
-        <tr>
-          <th>Order ID</th>
-          <th>Customer</th>
-          <th>Source</th>
-          <th>Products</th>
-          <th>Status</th>
-          <th>Order Date</th>
-          <th>Ship Date</th>
-          <th>Total</th>
-          <th>Actions</th>
-        </tr>
-        
-        <!-- Here is where the orders from the DB should be populated. -->
-        {% for order in all_orders %}
-        <tr>
-            <td>{{ order.id }}</td>
-            <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
-            <td>{{ order.platform }}</td>
-            <td>{% for item in order.order_items %} {{item.product.name}}, {% endfor %}</td>
-            <td>{{ order.status }}</td>
-            <td>{{ order.placed_at }}</td>
-            <td>{{order.shipment.shipped_at}}</td>
-            <td>${{ "%.2f"|format(order.total_amount) }}</td>
-            <td></td>
-        </tr>
-    {% endfor %}
+  <section class="sb-panel">
+    <h2>Order Queue</h2>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table sb-orders-table">
+        <caption>Current orders matching the selected filters</caption>
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Source</th>
+            <th scope="col">Items</th>
+            <th scope="col">Total</th>
+            <th scope="col">Placed</th>
+            <th scope="col">Shipment</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in all_orders %}
+            <tr>
+              <td data-label="Order">{{ order.order_number }}</td>
+              <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+              <td>{{ order.platform }}</td>
+              <td data-label="Items">
+                {% for item in order.order_items %}
+                  {{ item.product.name }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  No line items
+                {% endfor %}
+              </td>
+              <td data-label="Total">${{ order.total_amount }}</td>
+              <td data-label="Placed">{{ order.placed_at }}</td>
+              <td data-label="Shipment">
+                {% if order.shipment and order.shipment.tracking_number %}
+                  {{ order.shipment.carrier or "Carrier pending" }}: {{ order.shipment.tracking_number }}
+                {% else %}
+                  Not yet created
+                {% endif %}
+              </td>
+              <td data-label="Status">
+                {% if order.status in ("Completed", "Shipped", "Ready") %}
+                  <span class="sb-status sb-status-active">{{ order.status }}</span>
+                {% elif order.status in ("Waiting for Ingredients", "Packed", "In Progress") %}
+                  <span class="sb-status sb-status-pending">{{ order.status }}</span>
+                {% else %}
+                  <span class="sb-status">{{ order.status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" class="sb-empty">No orders match the current filters.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
       </table>
     </div>
-  </div>
-
-  <div class="w3-row-padding w3-margin-top w3-margin-bottom">
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Order Status Workflow</h5>
-        <ul class="w3-ul">
-          <li>New</li>
-          <li>In Progress</li>
-          <li>Waiting for Ingredients</li>
-          <li>Packed</li>
-          <li>Shipped</li>
-          <li>Completed</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="w3-half">
-      <div class="w3-container sb-panel w3-padding card-round">
-        <h5 class="sb-heading">Page Purpose</h5>
-        <p>
-          This page is meant to give the stakeholder one central place to view and manage orders instead of switching between Fiverr, Square, Google Sheets, and Google Drive.
-        </p>
-        <p>
-          In the full version, the table will be connected to the Flask backend and database instead of using sample data.
-        </p>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<script>
-  var mySidebar = document.getElementById("mySidebar");
-  var overlayBg = document.getElementById("myOverlay");
-
-  function w3_open() {
-    if (mySidebar.style.display === "block") {
-      mySidebar.style.display = "none";
-      overlayBg.style.display = "none";
-    } else {
-      mySidebar.style.display = "block";
-      overlayBg.style.display = "block";
-    }
-  }
-
-  function w3_close() {
-    mySidebar.style.display = "none";
-    overlayBg.style.display = "none";
-  }
-</script>
-
-</body>
-</html>
+  </section>
+{% endblock %}
