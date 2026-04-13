@@ -1595,9 +1595,11 @@ def inventory():
                          all_items=all_items,
                          search_query=search_query,
                          selected_category=category,
-                         selected_stock_status=stock_status)
+                         selected_stock_status=stock_status,
+                          )
     
-    @app.route("/add-new")
+    
+@app.route("/add-new")
 @login_required
 def add_new():
     return render_template("addNew.html")
