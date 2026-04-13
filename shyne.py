@@ -1330,6 +1330,11 @@ def inject_current_admin_label():
                 "visible": True,
             },
             {
+                "endpoint": "add_product",
+                "label": "Add Product",
+                "visible": True,
+            },
+            {
                 "endpoint": "tasks",
                 "label": "Tasks",
                 "visible": has_permission(PERMISSION_TASKS_VIEW),
