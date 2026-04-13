@@ -1,87 +1,59 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Add Inventory Item</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+{% extends "base_authenticated.html" %}
 
-  <style>
-    html, body, h1, h2, h3, h4, h5 { font-family: "Raleway", sans-serif; }
-    body { background-color: #f6f3ee; color: #4f4a45; }
-    .sb-topbar { background: linear-gradient(to right, #e7d8c3, #f3eadc); color: #5f5a54; border-bottom: 2px solid #d7c3aa; }
-    .sb-topbar .w3-bar-item { color: #5f5a54 !important; font-weight: 600; }
-    .sb-sidebar { background-color: #fcfaf7; color: #5f5a54; border-right: 1px solid #eadfce; }
-    .sb-sidebar .w3-bar-item { color: #5f5a54; font-weight: 500; }
-    .sb-sidebar .w3-bar-item:hover { background-color: #d7ece8 !important; color: #4c4a46 !important; }
-    .sb-active { background-color: #bfe3df !important; color: #4c4a46 !important; font-weight: bold; }
-    .sb-panel { background-color: #ffffff; color: #4f4a45; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 12px; }
-    .sb-heading { color: #7c746c; }
-    .sb-subtle { color: #7a746d; }
-    .sb-button { background-color: #bfe3df; color: #4c4a46; border: none; }
-    .sb-button-warm { background-color: #e8d5bd; color: #4c4a46; border: none; }
-  </style>
-</head>
-<body>
+{% block title %}Add Inventory Item{% endblock %}
+{% block page_title %}Add Inventory Item{% endblock %}
+{% block page_description %}
+  <p>Draft inventory-entry layout for review. This page does not save data yet.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
+  <a class="sb-button" href="{{ url_for('inventory') }}">Open live inventory page</a>
+{% endblock %}
 
-<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
-  <button class="w3-bar-item w3-button w3-hide-large" onclick="w3_open()"><i class="fa fa-bars"></i> Menu</button>
-  <span class="w3-bar-item w3-right">ShyneBeauty</span>
-</div>
+{% block content %}
+  <section class="sb-panel">
+    <h2>Layout Preview</h2>
+    <form class="sb-form-grid" novalidate>
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="inventory-item-name" name="name" type="text" placeholder=" ">
+          <label for="inventory-item-name">Item Name</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="inventory-unit" name="unit" type="text" placeholder=" ">
+          <label for="inventory-unit">Unit</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input sb-input-always-float" id="inventory-stock" name="stock_quantity" type="number" inputmode="decimal">
+          <label for="inventory-stock">Current Stock</label>
+        </div>
+      </div>
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input sb-input-always-float" id="inventory-reorder" name="reorder_threshold" type="number" inputmode="decimal">
+          <label for="inventory-reorder">Reorder Threshold</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="inventory-supplier" name="supplier_name" type="text" placeholder=" ">
+          <label for="inventory-supplier">Supplier Name</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="inventory-contact" name="supplier_contact" type="text" placeholder=" ">
+          <label for="inventory-contact">Supplier Contact</label>
+        </div>
+      </div>
+      <div class="sb-field sb-field-float sb-field-textarea">
+        <textarea class="sb-textarea" id="inventory-notes" name="notes" placeholder=" "></textarea>
+        <label for="inventory-notes">Notes</label>
+      </div>
+    </form>
+  </section>
 
-<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
-  <div class="w3-container"><h5 class="sb-heading">Dashboard</h5></div>
-  <div class="w3-bar-block">
-    <a href="/" class="w3-bar-item w3-button w3-padding">Home Dashboard</a>
-    <a href="/add-new" class="w3-bar-item w3-button w3-padding sb-active">Add New</a>
-  </div>
-</nav>
-
-<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" id="myOverlay"></div>
-
-<div class="w3-main" style="margin-left:300px;margin-top:43px">
-  <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-cubes"></i> Add Inventory Item</b></h3>
-    <p class="sb-subtle">Enter a new inventory item below.</p>
-  </header>
-
-  <div class="w3-container sb-panel w3-padding w3-margin">
-    <label><b>Item Name</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Enter item name">
-
-    <label><b>Category</b></label>
-    <select class="w3-select w3-border w3-margin-bottom">
-      <option>Ingredient</option>
-      <option>Packaging</option>
-      <option>Labels</option>
-      <option>Supply</option>
-    </select>
-
-    <label><b>Current Stock</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="number" placeholder="Enter stock amount">
-
-    <label><b>Unit</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Example: bottles, lbs, boxes">
-
-    <label><b>Reorder Level</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="number" placeholder="Enter reorder level">
-
-    <label><b>Supplier Notes</b></label>
-    <textarea class="w3-input w3-border w3-margin-bottom" rows="4" placeholder="Add notes"></textarea>
-
-    <button class="w3-button sb-button">Save Inventory Item</button>
-    <button class="w3-button sb-button-warm">Cancel</button>
-  </div>
-</div>
-
-<script>
-  var mySidebar = document.getElementById("mySidebar");
-  var overlayBg = document.getElementById("myOverlay");
-  function w3_open() { mySidebar.style.display = "block"; overlayBg.style.display = "block"; }
-  function w3_close() { mySidebar.style.display = "none"; overlayBg.style.display = "none"; }
-</script>
-
-</body>
-</html>
+  <section class="sb-panel">
+    <h2>Implementation Note</h2>
+    <p class="sb-section-note">
+      This page is aligned visually with the authenticated shell, but inventory edits
+      are still managed through the current operational tooling rather than this draft form.
+    </p>
+  </section>
+{% endblock %}

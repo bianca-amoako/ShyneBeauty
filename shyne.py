@@ -1569,45 +1569,39 @@ def customers():
 @app.route("/inventory")
 @require_permission(PERMISSION_INVENTORY_VIEW)
 def inventory():
-    search_query = request.args.get('search', '').strip()
-    category = request.args.get('category', '')
-    stock_status = request.args.get('stock_status', '')
+    search_query = request.args.get("search", "").strip()
+    stock_status = request.args.get("stock_status", "")
 
     query = Ingredient.query
-    
 
     if search_query:
-        query = query.filter(Ingredient.name.ilike(f'%{search_query}%'))
-
-    if category:
-        query = query.filter(Ingredient.category == category)
-    
+        query = query.filter(Ingredient.name.ilike(f"%{search_query}%"))
 
     if stock_status:
-        if stock_status == 'in_stock':
+        if stock_status == "in_stock":
             query = query.filter(Ingredient.stock_quantity > Ingredient.reorder_threshold)
-        elif stock_status == 'low_stock':
+        elif stock_status == "low_stock":
             query = query.filter(
                 Ingredient.stock_quantity <= Ingredient.reorder_threshold,
-                Ingredient.stock_quantity > 0
+                Ingredient.stock_quantity > 0,
             )
-        elif stock_status == 'out_of_stock':
+        elif stock_status == "out_of_stock":
             query = query.filter(Ingredient.stock_quantity == 0)
-    
+
     all_items = query.order_by(Ingredient.name).all()
-    
-    return render_template("inventory.html", 
-                         all_items=all_items,
-                         search_query=search_query,
-                         selected_category=category,
-                         selected_stock_status=stock_status,
-                          )
-    
-    
+
+    return render_template(
+        "inventory.html",
+        all_items=all_items,
+        search_query=search_query,
+        selected_stock_status=stock_status,
+    )
+
+
 @app.route("/add-new")
 @login_required
 def add_new():
-    return render_template("addNew.html")
+    return render_template("AddNew.html")
 
 @app.route("/add-customer")
 @login_required
