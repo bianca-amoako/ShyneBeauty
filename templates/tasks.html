@@ -1,373 +1,80 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Task List</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+{% extends "base_authenticated.html" %}
 
+{% block title %}Task List{% endblock %}
+{% block page_title %}Task List{% endblock %}
+{% block page_description %}
+  <p>Current prototype task surface for reviewing workflow shape and presentation readiness.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button" href="{{ url_for('orders') }}">Open live orders view</a>
+  <a class="sb-button-secondary" href="{{ url_for('add_order') }}">Review add-order layout</a>
+{% endblock %}
 
-<style>
-  html, body, h1, h2, h3, h4, h5 {
-    font-family: "Raleway", sans-serif;
-  }
+{% block content %}
+  <section class="sb-grid sb-grid-3">
+    <article class="sb-panel">
+      <h2>Status</h2>
+      <p class="sb-section-note">
+        This page is still a prototype. It is useful for layout review and capstone
+        planning, but it is not backed by a persisted task model yet.
+      </p>
+    </article>
+    <article class="sb-panel">
+      <h2>Use the live pages for</h2>
+      <ul class="sb-list">
+        <li>Order intake and status review</li>
+        <li>Customer lookup and source verification</li>
+        <li>Inventory constraint checks before production</li>
+      </ul>
+    </article>
+    <article class="sb-panel">
+      <h2>Still needed later</h2>
+      <ul class="sb-list">
+        <li>Persisted task records</li>
+        <li>Status update actions</li>
+        <li>Assignment and due-date workflow</li>
+      </ul>
+    </article>
+  </section>
 
-  body {
-    background-color: #f6f3ee;
-    color: #4f4a45;
-  }
-
-  .sb-topbar {
-    background: linear-gradient(to right, #e7d8c3, #f3eadc);
-    color: #5f5a54;
-    border-bottom: 2px solid #d7c3aa;
-  }
-
-  .sb-topbar .w3-bar-item {
-    color: #5f5a54 !important;
-    font-weight: 600;
-  }
-
-  .sb-sidebar {
-    background-color: #fcfaf7;
-    color: #5f5a54;
-    border-right: 1px solid #eadfce;
-  }
-
-  .sb-sidebar .w3-bar-item {
-    color: #5f5a54;
-    font-weight: 500;
-  }
-
-  .sb-sidebar .w3-bar-item:hover {
-    background-color: #d7ece8 !important;
-    color: #4c4a46 !important;
-  }
-
-  .sb-active {
-    background-color: #bfe3df !important;
-    color: #4c4a46 !important;
-    font-weight: bold;
-  }
-
-  .card-round {
-    border-radius: 12px;
-  }
-
-  .section-space {
-    margin-top: 18px;
-  }
-
-  .table-scroll {
-    overflow-x: auto;
-  }
-
-  .sb-card {
-    background-color: #ffffff;
-    border-left: 6px solid #b9ddd8;
-    color: #4f4a45;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-
-  .sb-card-accent {
-    background-color: #d8ece8;
-    color: #4f4a45;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-
-  .sb-card-warm {
-    background-color: #efe3d3;
-    color: #4f4a45;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-
-  .sb-card-alert {
-    background-color: #f3d7c8;
-    color: #4f4a45;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-
-  .sb-panel {
-    background-color: #ffffff;
-    color: #4f4a45;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border-radius: 12px;
-  }
-
-  .sb-heading {
-    color: #7c746c;
-    letter-spacing: 0.5px;
-  }
-
-  .sb-subtle {
-    color: #7a746d;
-  }
-
-  .sb-table th {
-    background-color: #bfe3df;
-    color: #4c4a46;
-  }
-
-  .sb-tag-aqua {
-    background-color: #bfe3df;
-    color: #3f3b37;
-  }
-
-  .sb-tag-beige {
-    background-color: #eadbc8;
-    color: #4c4a46;
-  }
-
-  .sb-tag-soft {
-    background-color: #f0e7dc;
-    color: #4c4a46;
-  }
-
-  .sb-progress-bg {
-    background-color: #ece7de;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .sb-progress-aqua {
-    background-color: #bfe3df;
-    color: #3f3b37;
-  }
-
-  .sb-progress-warm {
-    background-color: #e8d5bd;
-    color: #4c4a46;
-  }
-
-  .sb-progress-soft {
-    background-color: #d8ece8;
-    color: #4c4a46;
-  }
-
-  .sb-logo-title {
-    letter-spacing: 1px;
-  }
-
-  .sb-logout-form {
-    margin-top: 12px;
-  }
-
-  .sb-logout-button {
-    background-color: #f0e7dc;
-    color: #4c4a46;
-    border: none;
-    border-radius: 999px;
-    padding: 8px 14px;
-  }
-
-  .sb-logout-button:hover {
-    background-color: #e8d5bd !important;
-    color: #3f3b37 !important;
-  }
-</style>
-</head>
-
-<body class="w3-light-grey">
-
-<div class="w3-bar w3-top w3-large sb-topbar" style="z-index:4">
-  <button class="w3-bar-item w3-button w3-hide-large w3-hover-none" onclick="w3_open()">
-    <i class="fa fa-bars"></i> Menu
-  </button>
-  <span class="w3-bar-item w3-right">SHYNE BEAUTY</span>
-</div>
-
-<nav class="w3-sidebar w3-collapse sb-sidebar w3-animate-left" style="z-index:3;width:300px;" id="mySidebar"><br>
-  <div class="w3-container w3-row">
-    <div class="w3-col s4">
-      <img src="{{ url_for('static', filename='shyneIcon.png') }}" class="w3-circle w3-margin-right" style="width:46px">
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Prototype Workflow Snapshot</h2>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Draft task examples used for planning and demo rehearsal</caption>
+        <thead>
+          <tr>
+            <th scope="col">Task</th>
+            <th scope="col">Purpose</th>
+            <th scope="col">Suggested owner</th>
+            <th scope="col">Priority</th>
+            <th scope="col">State</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="Task">Review new order intake</td>
+            <td data-label="Purpose">Confirm source, quantity, and customer details before production work starts.</td>
+            <td data-label="Suggested owner">Staff Operator</td>
+            <td data-label="Priority">High</td>
+            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
+          </tr>
+          <tr>
+            <td data-label="Task">Check ingredient availability</td>
+            <td data-label="Purpose">Use inventory counts to spot missing stock before the order enters a production batch.</td>
+            <td data-label="Suggested owner">Inventory / Production</td>
+            <td data-label="Priority">Medium</td>
+            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
+          </tr>
+          <tr>
+            <td data-label="Task">Prepare shipping handoff</td>
+            <td data-label="Purpose">Verify packaging and tracking creation before an order is marked shipped.</td>
+            <td data-label="Suggested owner">Staff Operator</td>
+            <td data-label="Priority">Medium</td>
+            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="w3-col s8 w3-bar">
-      <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
-      <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
-        <button type="submit" class="w3-button sb-logout-button">
-          <i class="fa fa-sign-out"></i> Log out
-        </button>
-      </form>
-    </div>
-  </div>
-  <hr>
-
-  <div class="w3-container">
-    <h5 class="sb-heading">Dashboard</h5>
-  </div>
-
-  <div class="w3-bar-block">
-    <a href="#" class="w3-bar-item w3-button w3-padding-16 w3-hide-large w3-hover-black" onclick="w3_close()">
-      <i class="fa fa-remove fa-fw"></i> Close Menu
-    </a>
-
-    <a href="{{ url_for('index') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-dashboard fa-fw"></i> Home Dashboard
-    </a>
-
-    <a href="{{ url_for('orders') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
-    </a>
-
-    <a href="{{ url_for('inventory') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-cubes fa-fw"></i> Inventory
-    </a>
-
-    <a href="{{ url_for('customers') }}" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-users fa-fw"></i> Customers
-    </a>
-
-    <br><br>
-  </div>
-</nav>
-
-<div class="w3-overlay w3-hide-large w3-animate-opacity" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div>
-
-<div class="w3-main" style="margin-left:300px;margin-top:43px">
-
-  <header class="w3-container" style="padding-top:22px">
-    <h3 class="sb-heading"><b><i class="fa fa-tasks"></i> Task List</b></h3>
-    <p class="sb-subtle">Track tasks for each order.</p>
-  </header>
-
-<div class="w3-container">
-<table class="w3-table w3-striped w3-bordered w3-white">
-  <tr class="sb-topbar">
-    <th>Project</th>
-    <th>Task</th>
-    <th>Priority</th>
-    <th>Start</th>
-    <th>End</th>
-    <th>Done</th>
-    <th>Budget</th>
-  </tr>
-
-  <!-- Customer 1 -->
-  <tr class="w3-light-grey">
-    <td colspan="7"><b>ANITA NJIWAH</b></td>
-  </tr>
-
-  <tr class="task-first-row">
-    <td rowspan="1"><textarea class="w3-input w3-border auto-grow"></textarea></td>
-    <td><textarea class="w3-input w3-border auto-grow-task"></textarea></td>
-    <td>
-      <select class="w3-select w3-border">
-        <option value="">Priority</option>
-        <option>High</option><option>Medium</option><option>Low</option>
-      </select>
-    </td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input type="checkbox"></td>
-    <td rowspan="1"><textarea class="w3-input w3-border auto-grow" placeholder="$"></textarea></td>
-  </tr>
-
-  <!-- Add Task Button -->
-  <tr>
-    <td colspan="6" style="text-align:center;">
-      <button class="w3-button w3-small w3-green" onclick="addCustomerTask(this)">+ Add Task</button>
-    </td>
-    <td></td>
-  </tr>
-
-  <!-- Customer 2 -->
-  <tr class="w3-light-grey">
-    <td colspan="7"><b>BRANDON UMAMI</b></td>
-  </tr>
-
-  <tr class="task-first-row">
-    <td rowspan="1"><textarea class="w3-input w3-border auto-grow"></textarea></td>
-    <td><textarea class="w3-input w3-border auto-grow-task"></textarea></td>
-    <td>
-      <select class="w3-select w3-border">
-        <option value="">Priority</option>
-        <option>High</option><option>Medium</option><option>Low</option>
-      </select>
-    </td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input type="checkbox"></td>
-    <td rowspan="1"><textarea class="w3-input w3-border auto-grow" placeholder="$"></textarea></td>
-  </tr>
-
-  <tr>
-    <td colspan="6" style="text-align:center;">
-      <button class="w3-button w3-small w3-green" onclick="addCustomerTask(this)">+ Add Task</button>
-    </td>
-    <td></td>
-  </tr>
-
-</table>
-</div>
-
-<script>
-const mySidebar = document.getElementById('mySidebar');
-const overlayBg = document.getElementById('myOverlay');
-
-function w3_open() {
-  if (mySidebar.style.display === 'block') {
-    mySidebar.style.display = 'none';
-    overlayBg.style.display = 'none';
-  } else {
-    mySidebar.style.display = 'block';
-    overlayBg.style.display = 'block';
-  }
-}
-
-function w3_close() {
-  mySidebar.style.display = 'none';
-  overlayBg.style.display = 'none';
-}
-
-function attachAutoGrow(textarea) {
-  textarea.addEventListener('input', () => {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-  });
-  textarea.style.height = textarea.scrollHeight + 'px';
-}
-document.querySelectorAll('.auto-grow, .auto-grow-task').forEach(attachAutoGrow);
-
-function addCustomerTask(button) {
-  const addButtonRow = button.closest('tr');
-  const table = addButtonRow.closest('table');
-
-  // Find the first task row in this project
-  let firstRow = addButtonRow.previousElementSibling;
-  while (!firstRow.classList.contains('task-first-row')) {
-    firstRow = firstRow.previousElementSibling;
-  }
-
-  const projectCell = firstRow.querySelector('td[rowspan]');
-  const budgetCell = firstRow.querySelectorAll('td[rowspan]')[1];
-
-  // Increase rowspan
-  projectCell.rowSpan = parseInt(projectCell.rowSpan) + 1;
-  budgetCell.rowSpan = parseInt(budgetCell.rowSpan) + 1;
-
-  // Create new task row
-  const newRow = document.createElement('tr');
-  newRow.innerHTML = `
-    <td><textarea class="w3-input w3-border auto-grow-task" placeholder="Task name"></textarea></td>
-    <td>
-      <select class="w3-select w3-border">
-        <option value="">Priority</option>
-        <option>High</option><option>Medium</option><option>Low</option>
-      </select>
-    </td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input class="w3-input w3-border" type="date"></td>
-    <td><input type="checkbox"></td>
-  `;
-
-  // Insert new task above the Add Task button
-  addButtonRow.before(newRow);
-
-  attachAutoGrow(newRow.querySelector('textarea'));
-}
-</script>
-
-</body>
-</html>
+  </section>
+{% endblock %}
