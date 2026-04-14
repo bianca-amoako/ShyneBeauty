@@ -35,7 +35,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -1633,10 +1633,84 @@ def inventory():
 def add_new():
     return render_template("AddNew.html")
 
-@app.route("/add-customer")
-@login_required
+@app.route("/add-customer", methods=["GET", "POST"])
+@require_permission(PERMISSION_CUSTOMERS_EDIT)
 def add_customer():
-    return render_template("addCustomer.html")
+    form_data = {
+        "first_name": "",
+        "last_name": "",
+        "source": "",
+        "email": "",
+        "phone": "",
+        "country": "USA",
+        "street_address": "",
+        "city": "",
+        "state": "",
+        "postal_code": "",
+    }
+
+    if request.method == "POST":
+        form_data = {
+            "first_name": (request.form.get("first_name") or "").strip(),
+            "last_name": (request.form.get("last_name") or "").strip(),
+            "source": (request.form.get("source") or "").strip(),
+            "email": normalize_email(request.form.get("email")),
+            "phone": (request.form.get("phone") or "").strip(),
+            "country": (request.form.get("country") or "").strip() or "USA",
+            "street_address": (request.form.get("street_address") or "").strip(),
+            "city": (request.form.get("city") or "").strip(),
+            "state": (request.form.get("state") or "").strip(),
+            "postal_code": (request.form.get("postal_code") or "").strip(),
+        }
+
+        errors = []
+        if not form_data["first_name"]:
+            errors.append("First name is required.")
+        if not form_data["last_name"]:
+            errors.append("Last name is required.")
+        if not form_data["email"]:
+            errors.append("Email is required.")
+
+        existing_customer = None
+        if form_data["email"]:
+            existing_customer = Customer.query.filter(
+                func.lower(Customer.email) == form_data["email"]
+            ).first()
+            if existing_customer:
+                errors.append("A customer with that email already exists.")
+
+        if not errors:
+            customer = Customer(
+                first_name=form_data["first_name"],
+                last_name=form_data["last_name"],
+                email=form_data["email"],
+                phone=form_data["phone"] or None,
+                street_address=form_data["street_address"] or None,
+                city=form_data["city"] or None,
+                state=form_data["state"] or None,
+                postal_code=form_data["postal_code"] or None,
+                country=form_data["country"],
+                source=form_data["source"] or None,
+            )
+            try:
+                db.session.add(customer)
+                db.session.commit()
+            except ValueError as exc:
+                db.session.rollback()
+                errors.append(str(exc))
+
+        if errors:
+            for error in errors:
+                flash(error, "error")
+        else:
+            flash("Customer created.", "success")
+            return redirect(url_for("customers", search=form_data["email"]))
+
+    return render_template(
+        "addCustomer.html",
+        form_data=form_data,
+        source_options=CUSTOMER_SOURCE_OPTIONS,
+    )
 
 @app.route("/add-order")
 @login_required
