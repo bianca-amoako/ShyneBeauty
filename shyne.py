@@ -1855,7 +1855,9 @@ def add_order():
         parsed_line_items = []
         total_amount = Decimal("0.00")
 
-        if Order.query.filter(
+        if not form_data["order_number"]:
+            errors.append("Order number is required.")
+        elif Order.query.filter(
             func.lower(Order.order_number) == form_data["order_number"].lower()
         ).first():
             errors.append("An order with that number already exists.")
@@ -1934,7 +1936,7 @@ def add_order():
         if not errors:
             order = Order(
                 customer=customer,
-                order_number=generate_order_number(),
+                order_number=form_data["order_number"],
                 platform=form_data["platform"],
                 total_amount=total_amount,
                 status=form_data["status"],
@@ -1952,10 +1954,17 @@ def add_order():
                         unit_price=item["unit_price"],
                     )
                 )
-            
+
+            db.session.add(
+                OrderStatusEvent(
+                    order=order,
+                    event_status=form_data["status"],
+                    message="Initial status recorded on order creation.",
+                )
+            )
             db.session.commit()
             flash(f"Order {order.order_number} created successfully!", "success")
-            return redirect(url_for('orders'))
+            return redirect(url_for("orders", search=order.order_number))
         
         # If there are errors, show them
         for error in errors:
