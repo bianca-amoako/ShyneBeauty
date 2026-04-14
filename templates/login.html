@@ -11,6 +11,7 @@
 </head>
 
 <body class="sb-login-body">
+  {% from "_form_helpers.html" import csrf_input %}
   <main class="sb-login-shell">
     <section class="sb-login-panel" aria-labelledby="login-heading">
       <div class="sb-brand-mark">
@@ -55,6 +56,7 @@
       {% endif %}
 
       <form method="post" action="{{ url_for('login') }}" novalidate>
+        {{ csrf_input() }}
         <input type="hidden" name="next" value="{{ next_url }}">
 
         <div class="sb-field sb-field-float">

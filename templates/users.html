@@ -1,4 +1,5 @@
 {% extends "base_authenticated.html" %}
+{% from "_form_helpers.html" import csrf_input %}
 
 {% macro hidden_filters(filter_state) -%}
   <input type="hidden" name="search" value="{{ filter_state.search }}">
@@ -255,6 +256,7 @@
         <h2 id="selected-user-heading">Create user</h2>
         <p class="sb-section-note">Create an active account with a temporary password. The user will be forced to change it on first login.</p>
         <form class="sb-form-grid" method="post" action="{{ url_for('invite_user') }}">
+          {{ csrf_input() }}
           {{ hidden_filters(filter_state) }}
           <div class="sb-field">
             <label for="invite-full-name">Full Name</label>
@@ -388,6 +390,7 @@
         <section class="sb-inspector-section">
           <h3>Change Role</h3>
           <form class="sb-form-grid" method="post" action="{{ url_for('update_user_role', user_id=selected_user.id) }}">
+            {{ csrf_input() }}
             {{ hidden_filters(filter_state) }}
             <div class="sb-field">
               <label for="role-{{ selected_user.id }}">Role</label>
@@ -411,6 +414,7 @@
             <h3>Activate Account</h3>
             <p class="sb-inline-note">Legacy invited account support only. Activation sets a temporary password and requires the user to change it on first login.</p>
             <form class="sb-form-grid" method="post" action="{{ url_for('activate_user', user_id=selected_user.id) }}">
+              {{ csrf_input() }}
               {{ hidden_filters(filter_state) }}
               <div class="sb-field">
                 <label for="activate-password-{{ selected_user.id }}">Temporary Password</label>
@@ -431,6 +435,7 @@
           <section class="sb-inspector-section">
             <h3>Set Temporary Password</h3>
             <form class="sb-form-grid" method="post" action="{{ url_for('set_temporary_password', user_id=selected_user.id) }}">
+              {{ csrf_input() }}
               {{ hidden_filters(filter_state) }}
               <div class="sb-field">
                 <label for="temporary-password-{{ selected_user.id }}">Temporary Password</label>
@@ -452,21 +457,25 @@
           {% if selected_user.get_account_status() == 'invited' %}
             <div class="sb-form-actions">
               <form method="post" action="{{ url_for('resend_invite', user_id=selected_user.id) }}">
+                {{ csrf_input() }}
                 {{ hidden_filters(filter_state) }}
                 <button class="sb-button-secondary" type="submit">Resend invite</button>
               </form>
               <form method="post" action="{{ url_for('cancel_invite', user_id=selected_user.id) }}">
+                {{ csrf_input() }}
                 {{ hidden_filters(filter_state) }}
                 <button class="sb-button-danger" type="submit">Cancel invite</button>
               </form>
             </div>
           {% elif selected_user.get_account_status() == 'active' %}
             <form method="post" action="{{ url_for('suspend_user', user_id=selected_user.id) }}">
+              {{ csrf_input() }}
               {{ hidden_filters(filter_state) }}
               <button class="sb-button-danger" type="submit">Suspend account</button>
             </form>
           {% else %}
             <form method="post" action="{{ url_for('reactivate_user', user_id=selected_user.id) }}">
+              {{ csrf_input() }}
               {{ hidden_filters(filter_state) }}
               <button class="sb-button" type="submit">Reactivate account</button>
             </form>

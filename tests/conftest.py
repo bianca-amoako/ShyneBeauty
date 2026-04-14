@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -44,6 +45,7 @@ def app():
         SECRET_KEY="test-secret-key",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         ENABLE_DEV_TEST_ADMIN=False,
+        WTF_CSRF_ENABLED=False,
     )
 
     with flask_app.app_context():
@@ -60,6 +62,33 @@ def client(app):
 
 
 @pytest.fixture()
+def csrf_client(app):
+    original_value = app.config["WTF_CSRF_ENABLED"]
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        yield app.test_client()
+    finally:
+        app.config["WTF_CSRF_ENABLED"] = original_value
+
+
+def extract_csrf_token(response_data):
+    html = response_data.decode("utf-8")
+    match = re.search(r'name="csrf_token"\s+value="([^"]+)"', html)
+    assert match, "Expected a CSRF token in the response body."
+    return match.group(1)
+
+
+@pytest.fixture()
+def csrf_token_for():
+    def _csrf_token_for(client, path):
+        response = client.get(path)
+        assert response.status_code == 200
+        return extract_csrf_token(response.data)
+
+    return _csrf_token_for
+
+
+@pytest.fixture()
 def login():
     def _login(
         client,
@@ -73,6 +102,8 @@ def login():
             "email": email,
             "password": password,
         }
+        if client.application.config.get("WTF_CSRF_ENABLED"):
+            data["csrf_token"] = extract_csrf_token(client.get("/login").data)
         if remember_me:
             data["remember_me"] = "on"
         if next_url is not None:
