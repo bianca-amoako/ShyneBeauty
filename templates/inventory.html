@@ -4,14 +4,41 @@
 {% block page_title %}Inventory Page{% endblock %}
 {% block head_extra %}
   <style>
-    .sb-inventory-table td,
-    .sb-inventory-table th {
-      white-space: normal;
+    @media (max-width: 760px) {
+      .sb-inventory-table thead {
+        display: none;
+      }
+
+      .sb-inventory-table,
+      .sb-inventory-table tbody,
+      .sb-inventory-table tr,
+      .sb-inventory-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .sb-inventory-table tr {
+        padding: 14px 12px;
+        border-bottom: 1px solid #ece2d5;
+      }
+
+      .sb-inventory-table td {
+        padding: 8px 0;
+        border-bottom: 0;
+      }
+
+      .sb-inventory-table td::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--sb-text-soft);
+        font-size: 12px;
+        margin-bottom: 3px;
+      }
     }
   </style>
 {% endblock %}
 {% block page_description %}
-  <p>Track ingredient stock levels, supplier context, and reorder status.</p>
+  <p>Track ingredients, packaging supplies, stock levels, and reorder status.</p>
 {% endblock %}
 
 {% block content %}
@@ -50,6 +77,10 @@
           <dd>{{ search_query or "All items" }}</dd>
         </div>
         <div>
+          <dt>Category</dt>
+          <dd>{{ selected_category or "All categories" }}</dd>
+        </div>
+        <div>
           <dt>Stock Status</dt>
           <dd>
             {% if selected_stock_status == "in_stock" %}
@@ -80,21 +111,28 @@
   <section class="sb-panel" style="margin-top:16px;">
     <form class="sb-form-grid" method="get" action="{{ url_for('inventory') }}">
       <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="inventory-search" type="text" name="search" placeholder=" " value="{{ search_query or '' }}">
+        <div class="sb-field">
           <label for="inventory-search">Search Inventory</label>
+          <input class="sb-input" id="inventory-search" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
         </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="inventory-status">Stock Status</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="inventory-status" name="stock_status">
-              <option value="">All Statuses</option>
-              <option value="in_stock" {% if selected_stock_status == "in_stock" %}selected{% endif %}>In Stock</option>
-              <option value="low_stock" {% if selected_stock_status == "low_stock" %}selected{% endif %}>Low Stock</option>
-              <option value="out_of_stock" {% if selected_stock_status == "out_of_stock" %}selected{% endif %}>Out of Stock</option>
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
-          </div>
+        <div class="sb-field">
+          <label for="inventory-category">Category</label>
+          <select class="sb-select" id="inventory-category" name="category">
+            <option value="">All Categories</option>
+            <option value="Ingredients" {% if selected_category == "Ingredients" %}selected{% endif %}>Ingredients</option>
+            <option value="Packaging" {% if selected_category == "Packaging" %}selected{% endif %}>Packaging</option>
+            <option value="Labels" {% if selected_category == "Labels" %}selected{% endif %}>Labels</option>
+            <option value="Supplies" {% if selected_category == "Supplies" %}selected{% endif %}>Supplies</option>
+          </select>
+        </div>
+        <div class="sb-field">
+          <label for="inventory-status">Stock Status</label>
+          <select class="sb-select" id="inventory-status" name="stock_status">
+            <option value="">All Statuses</option>
+            <option value="in_stock" {% if selected_stock_status == "in_stock" %}selected{% endif %}>In Stock</option>
+            <option value="low_stock" {% if selected_stock_status == "low_stock" %}selected{% endif %}>Low Stock</option>
+            <option value="out_of_stock" {% if selected_stock_status == "out_of_stock" %}selected{% endif %}>Out of Stock</option>
+          </select>
         </div>
       </div>
       <div class="sb-form-actions">
@@ -107,11 +145,12 @@
   <section class="sb-panel">
     <h2>Inventory List</h2>
     <div class="sb-table-wrap">
-      <table class="sb-data-table sb-responsive-table sb-inventory-table">
+      <table class="sb-data-table sb-inventory-table">
         <caption>Ingredient inventory snapshot</caption>
         <thead>
           <tr>
             <th scope="col">Item Name</th>
+            <th scope="col">Category</th>
             <th scope="col">Current Stock</th>
             <th scope="col">Unit</th>
             <th scope="col">Reorder Level</th>
@@ -123,6 +162,7 @@
           {% for item in all_items %}
             <tr>
               <td data-label="Item Name">{{ item.name }}</td>
+              <td data-label="Category">{{ item.category or "Uncategorized" }}</td>
               <td data-label="Current Stock">{{ item.stock_quantity }}</td>
               <td data-label="Unit">{{ item.unit }}</td>
               <td data-label="Reorder Level">{{ item.reorder_threshold }}</td>
@@ -139,7 +179,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="6" class="sb-empty">
+              <td colspan="7" class="sb-empty">
                 No inventory items match the current filters.
               </td>
             </tr>
@@ -167,8 +207,7 @@
     <section class="sb-panel">
       <h2>Page Purpose</h2>
       <p class="sb-section-note">
-        This page keeps ingredient and supplier context visible for planning and
-        fulfillment while technical edits remain in the protected admin console.
+        This page keeps ingredient, packaging, and supplier context visible for planning and fulfillment while technical edits remain in the protected admin console.
       </p>
     </section>
   </div>

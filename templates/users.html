@@ -131,54 +131,45 @@
         <input type="hidden" name="selected_user" value="{{ selected_user.id }}">
       {% endif %}
       <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
+        <div class="sb-field">
+          <label for="user-search">Search</label>
           <input
             class="sb-input"
             id="user-search"
             name="search"
             type="text"
-            placeholder=" "
+            placeholder="Search by name or email"
             value="{{ filter_state.search }}"
           >
-          <label for="user-search">Search</label>
         </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="user-role-filter">Role</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="user-role-filter" name="role_filter">
-              <option value="">All Roles</option>
-              {% for role in role_options %}
-                <option value="{{ role }}" {% if filter_state.role_filter == role %}selected{% endif %}>{{ role }}</option>
-              {% endfor %}
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
-          </div>
+        <div class="sb-field">
+          <label for="user-role-filter">Role</label>
+          <select class="sb-select" id="user-role-filter" name="role_filter">
+            <option value="">All Roles</option>
+            {% for role in role_options %}
+              <option value="{{ role }}" {% if filter_state.role_filter == role %}selected{% endif %}>{{ role }}</option>
+            {% endfor %}
+          </select>
         </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="user-status-filter">Account Status</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="user-status-filter" name="status_filter">
-              <option value="">All Statuses</option>
-              {% for value, label in status_options %}
-                <option value="{{ value }}" {% if filter_state.status_filter == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
-          </div>
+        <div class="sb-field">
+          <label for="user-status-filter">Account Status</label>
+          <select class="sb-select" id="user-status-filter" name="status_filter">
+            <option value="">All Statuses</option>
+            {% for value, label in status_options %}
+              <option value="{{ value }}" {% if filter_state.status_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
       <div class="sb-form-row">
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="user-last-login-filter">Last Login State</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="user-last-login-filter" name="last_login_filter">
-              <option value="">All States</option>
-              {% for value, label in last_login_options %}
-                <option value="{{ value }}" {% if filter_state.last_login_filter == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
-          </div>
+        <div class="sb-field">
+          <label for="user-last-login-filter">Last Login State</label>
+          <select class="sb-select" id="user-last-login-filter" name="last_login_filter">
+            <option value="">All States</option>
+            {% for value, label in last_login_options %}
+              <option value="{{ value }}" {% if filter_state.last_login_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="sb-field">
           <span class="sb-inline-note">Hidden technical `Dev Admin` accounts are managed separately and do not appear in this table.</span>
@@ -259,51 +250,45 @@
       </div>
     </section>
 
-    <aside class="sb-panel sb-panel-glass sb-inspector" id="selected-user-panel" tabindex="-1" aria-labelledby="selected-user-heading">
+    <aside class="sb-panel sb-inspector" id="selected-user-panel" tabindex="-1" aria-labelledby="selected-user-heading">
       {% if show_invite %}
         <h2 id="selected-user-heading">Create user</h2>
         <p class="sb-section-note">Create an active account with a temporary password. The user will be forced to change it on first login.</p>
         <form class="sb-form-grid" method="post" action="{{ url_for('invite_user') }}">
           {{ hidden_filters(filter_state) }}
-          <div class="sb-field sb-field-float">
-            <input class="sb-input" id="invite-full-name" name="full_name" type="text" placeholder=" " autofocus>
+          <div class="sb-field">
             <label for="invite-full-name">Full Name</label>
+            <input class="sb-input" id="invite-full-name" name="full_name" type="text" autofocus>
           </div>
-          <div class="sb-field sb-field-float">
-            <input class="sb-input" id="invite-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder=" " required>
+          <div class="sb-field">
             <label for="invite-email">Email</label>
+            <input class="sb-input" id="invite-email" name="email" type="email" inputmode="email" autocomplete="email" required>
           </div>
-          <div class="sb-field sb-field-select">
-            <label class="sb-label-above" for="invite-role">Role</label>
-            <div class="sb-select-wrap">
-              <select class="sb-select" id="invite-role" name="role" required>
-                {% for role in role_options %}
-                  <option value="{{ role }}">{{ role }}</option>
-                {% endfor %}
-              </select>
-              <span class="sb-select-arrow" aria-hidden="true"></span>
-            </div>
+          <div class="sb-field">
+            <label for="invite-role">Role</label>
+            <select class="sb-select" id="invite-role" name="role" required>
+              {% for role in role_options %}
+                <option value="{{ role }}">{{ role }}</option>
+              {% endfor %}
+            </select>
           </div>
-          <div class="sb-field sb-field-select">
-            <label class="sb-label-above" for="password-mode">Temporary Password Mode</label>
-            <div class="sb-select-wrap">
-              <select class="sb-select" id="password-mode" name="password_mode">
-                <option value="generated">System generated</option>
-                <option value="manual">Admin entered</option>
-              </select>
-              <span class="sb-select-arrow" aria-hidden="true"></span>
-            </div>
+          <div class="sb-field">
+            <label for="password-mode">Temporary Password Mode</label>
+            <select class="sb-select" id="password-mode" name="password_mode">
+              <option value="generated">System generated</option>
+              <option value="manual">Admin entered</option>
+            </select>
           </div>
           <div class="sb-field" id="generated-password-note">
             <span class="sb-inline-note">The app will generate a strong temporary password and show it once after the account is created.</span>
           </div>
-          <div class="sb-field sb-field-float" id="manual-password-field" hidden>
-            <input class="sb-input" id="create-password" name="password" type="password" autocomplete="new-password" placeholder=" ">
+          <div class="sb-field" id="manual-password-field" hidden>
             <label for="create-password">Temporary Password</label>
+            <input class="sb-input" id="create-password" name="password" type="password" autocomplete="new-password">
           </div>
-          <div class="sb-field sb-field-float" id="manual-password-confirm-field" hidden>
-            <input class="sb-input" id="create-password-confirm" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" ">
+          <div class="sb-field" id="manual-password-confirm-field" hidden>
             <label for="create-password-confirm">Confirm Temporary Password</label>
+            <input class="sb-input" id="create-password-confirm" name="password_confirmation" type="password" autocomplete="new-password">
           </div>
           <div class="sb-form-actions">
             <button class="sb-button" type="submit">Create user</button>
@@ -404,16 +389,13 @@
           <h3>Change Role</h3>
           <form class="sb-form-grid" method="post" action="{{ url_for('update_user_role', user_id=selected_user.id) }}">
             {{ hidden_filters(filter_state) }}
-            <div class="sb-field sb-field-select">
-              <label class="sb-label-above" for="role-{{ selected_user.id }}">Role</label>
-              <div class="sb-select-wrap">
-                <select class="sb-select" id="role-{{ selected_user.id }}" name="role" autofocus>
-                  {% for role in role_options %}
-                    <option value="{{ role }}" {% if selected_user.get_role() == role %}selected{% endif %}>{{ role }}</option>
-                  {% endfor %}
-                </select>
-                <span class="sb-select-arrow" aria-hidden="true"></span>
-              </div>
+            <div class="sb-field">
+              <label for="role-{{ selected_user.id }}">Role</label>
+              <select class="sb-select" id="role-{{ selected_user.id }}" name="role" autofocus>
+                {% for role in role_options %}
+                  <option value="{{ role }}" {% if selected_user.get_role() == role %}selected{% endif %}>{{ role }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="sb-form-actions">
               <button class="sb-button" type="submit">Change role</button>
@@ -430,13 +412,13 @@
             <p class="sb-inline-note">Legacy invited account support only. Activation sets a temporary password and requires the user to change it on first login.</p>
             <form class="sb-form-grid" method="post" action="{{ url_for('activate_user', user_id=selected_user.id) }}">
               {{ hidden_filters(filter_state) }}
-              <div class="sb-field sb-field-float">
-                <input class="sb-input" id="activate-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" placeholder=" " required>
+              <div class="sb-field">
                 <label for="activate-password-{{ selected_user.id }}">Temporary Password</label>
+                <input class="sb-input" id="activate-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
               </div>
-              <div class="sb-field sb-field-float">
-                <input class="sb-input" id="activate-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" " required>
+              <div class="sb-field">
                 <label for="activate-password-confirm-{{ selected_user.id }}">Confirm Temporary Password</label>
+                <input class="sb-input" id="activate-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-form-actions">
                 <button class="sb-button" type="submit">Activate account</button>
@@ -450,13 +432,13 @@
             <h3>Set Temporary Password</h3>
             <form class="sb-form-grid" method="post" action="{{ url_for('set_temporary_password', user_id=selected_user.id) }}">
               {{ hidden_filters(filter_state) }}
-              <div class="sb-field sb-field-float">
-                <input class="sb-input" id="temporary-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" placeholder=" " required>
+              <div class="sb-field">
                 <label for="temporary-password-{{ selected_user.id }}">Temporary Password</label>
+                <input class="sb-input" id="temporary-password-{{ selected_user.id }}" name="password" type="password" autocomplete="new-password" required>
               </div>
-              <div class="sb-field sb-field-float">
-                <input class="sb-input" id="temporary-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" " required>
+              <div class="sb-field">
                 <label for="temporary-password-confirm-{{ selected_user.id }}">Confirm Password</label>
+                <input class="sb-input" id="temporary-password-confirm-{{ selected_user.id }}" name="password_confirmation" type="password" autocomplete="new-password" required>
               </div>
               <div class="sb-form-actions">
                 <button class="sb-button-secondary" type="submit">Set temporary password</button>

@@ -1570,12 +1570,16 @@ def customers():
 @require_permission(PERMISSION_INVENTORY_VIEW)
 def inventory():
     search_query = request.args.get("search", "").strip()
+    category = request.args.get("category", "")
     stock_status = request.args.get("stock_status", "")
 
     query = Ingredient.query
 
     if search_query:
         query = query.filter(Ingredient.name.ilike(f"%{search_query}%"))
+
+    if category:
+        query = query.filter(Ingredient.category == category)
 
     if stock_status:
         if stock_status == "in_stock":
@@ -1594,6 +1598,7 @@ def inventory():
         "inventory.html",
         all_items=all_items,
         search_query=search_query,
+        selected_category=category,
         selected_stock_status=stock_status,
     )
 
