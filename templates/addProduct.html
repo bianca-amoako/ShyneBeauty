@@ -1,9 +1,12 @@
 {% extends "base_authenticated.html" %}
+{% from "_form_helpers.html" import csrf_input %}
 
 {% block title %}Add Product{% endblock %}
 {% block page_title %}Add Product{% endblock %}
 {% block page_description %}
-  <p>Enter new product information below.</p>
+
+<p>Create a finished-product record so it can be used in order entry and catalog operations.</p>
+
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>

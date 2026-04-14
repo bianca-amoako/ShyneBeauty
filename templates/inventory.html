@@ -40,6 +40,10 @@
 {% block page_description %}
   <p>Track ingredients, packaging supplies, stock levels, and reorder status.</p>
 {% endblock %}
+{% block page_actions %}
+  <a class="sb-button" href="{{ url_for('add_inventory') }}">Add inventory item</a>
+  <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
+{% endblock %}
 
 {% block content %}
   {% set summary = namespace(low_stock=0, out_of_stock=0) %}
@@ -77,10 +81,6 @@
           <dd>{{ search_query or "All items" }}</dd>
         </div>
         <div>
-          <dt>Category</dt>
-          <dd>{{ selected_category or "All categories" }}</dd>
-        </div>
-        <div>
           <dt>Stock Status</dt>
           <dd>
             {% if selected_stock_status == "in_stock" %}
@@ -116,16 +116,6 @@
           <input class="sb-input" id="inventory-search" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
         </div>
         <div class="sb-field">
-          <label for="inventory-category">Category</label>
-          <select class="sb-select" id="inventory-category" name="category">
-            <option value="">All Categories</option>
-            <option value="Ingredients" {% if selected_category == "Ingredients" %}selected{% endif %}>Ingredients</option>
-            <option value="Packaging" {% if selected_category == "Packaging" %}selected{% endif %}>Packaging</option>
-            <option value="Labels" {% if selected_category == "Labels" %}selected{% endif %}>Labels</option>
-            <option value="Supplies" {% if selected_category == "Supplies" %}selected{% endif %}>Supplies</option>
-          </select>
-        </div>
-        <div class="sb-field">
           <label for="inventory-status">Stock Status</label>
           <select class="sb-select" id="inventory-status" name="stock_status">
             <option value="">All Statuses</option>
@@ -150,7 +140,6 @@
         <thead>
           <tr>
             <th scope="col">Item Name</th>
-            <th scope="col">Category</th>
             <th scope="col">Current Stock</th>
             <th scope="col">Unit</th>
             <th scope="col">Reorder Level</th>
@@ -162,7 +151,6 @@
           {% for item in all_items %}
             <tr>
               <td data-label="Item Name">{{ item.name }}</td>
-              <td data-label="Category">{{ item.category or "Uncategorized" }}</td>
               <td data-label="Current Stock">{{ item.stock_quantity }}</td>
               <td data-label="Unit">{{ item.unit }}</td>
               <td data-label="Reorder Level">{{ item.reorder_threshold }}</td>
@@ -179,7 +167,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="7" class="sb-empty">
+              <td colspan="6" class="sb-empty">
                 No inventory items match the current filters.
               </td>
             </tr>
@@ -207,7 +195,7 @@
     <section class="sb-panel">
       <h2>Page Purpose</h2>
       <p class="sb-section-note">
-        This page keeps ingredient, packaging, and supplier context visible for planning and fulfillment while technical edits remain in the protected admin console.
+        This page keeps ingredient, stock, and supplier context visible for planning and fulfillment while letting inventory staff add new items without using the technical admin console.
       </p>
     </section>
   </div>
