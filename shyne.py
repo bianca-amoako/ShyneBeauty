@@ -994,6 +994,43 @@ def has_permission(permission_key, admin_user=None, *, now=None):
     return permission_key in get_effective_permissions(target_user)
 
 
+def has_any_permission(*permission_keys, admin_user=None, now=None):
+    return any(
+        has_permission(permission_key, admin_user=admin_user, now=now)
+        for permission_key in permission_keys
+    )
+
+
+def build_add_flow_items(admin_user=None):
+    target_user = admin_user or current_user
+    return [
+        {
+            "endpoint": "add_customer",
+            "label": "Add Customer",
+            "description": "Create a customer record with contact and address details.",
+            "visible": has_permission(PERMISSION_CUSTOMERS_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_order",
+            "label": "Add Order",
+            "description": "Create an order for an existing customer with line items and an initial status.",
+            "visible": has_permission(PERMISSION_ORDERS_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_inventory",
+            "label": "Add Inventory Item",
+            "description": "Create an ingredient or supply record for stock and reorder tracking.",
+            "visible": has_permission(PERMISSION_INVENTORY_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_product",
+            "label": "Add Product",
+            "description": "Create a product so it can be used in future order entry.",
+            "visible": has_permission(PERMISSION_PRODUCTION_EDIT, admin_user=target_user),
+        },
+    ]
+
+
 def is_superadmin(admin_user=None):
     target_user = admin_user or current_user
     return getattr(target_user, "is_authenticated", False) and (
@@ -1331,6 +1368,7 @@ def inject_current_admin_label():
     if current_user.is_authenticated:
         label = current_user.full_name or current_user.email
         role_label = current_user.get_role()
+        add_flow_items = build_add_flow_items(current_user)
         nav_items = [
             {
                 "endpoint": "index",
@@ -1355,12 +1393,12 @@ def inject_current_admin_label():
             {
                 "endpoint": "add_new",
                 "label": "Add New",
-                "visible": True,
+                "visible": any(item["visible"] for item in add_flow_items),
             },
             {
                 "endpoint": "add_product",
                 "label": "Add Product",
-                "visible": True,
+                "visible": has_permission(PERMISSION_PRODUCTION_EDIT),
             },
             {
                 "endpoint": "tasks",
@@ -1377,6 +1415,9 @@ def inject_current_admin_label():
         "current_admin_label": label,
         "current_admin_role_label": role_label,
         "authenticated_nav_items": [item for item in nav_items if item["visible"]],
+        "add_flow_items": [item for item in build_add_flow_items() if item["visible"]]
+        if current_user.is_authenticated
+        else [],
     }
 
 
@@ -1636,6 +1677,29 @@ def inventory():
 @app.route("/add-new")
 @login_required
 def add_new():
+    if not has_any_permission(
+        PERMISSION_CUSTOMERS_EDIT,
+        PERMISSION_ORDERS_EDIT,
+        PERMISSION_INVENTORY_EDIT,
+        PERMISSION_PRODUCTION_EDIT,
+    ):
+        log_admin_access_event(
+            actor=current_user,
+            target=current_user,
+            event_type=ADMIN_ACCESS_EVENT_ACCESS_DENIED,
+            outcome=ADMIN_ACCESS_EVENT_OUTCOME_DENIED,
+            note=f"{request.method} {request.path}",
+        )
+        db.session.commit()
+        return (
+            render_template(
+                "access_denied.html",
+                page_title="Add workflows denied",
+                denial_message="You do not have permission to create business records from this menu.",
+            ),
+            403,
+        )
+
     return render_template("AddNew.html")
 
 @app.route("/add-customer")

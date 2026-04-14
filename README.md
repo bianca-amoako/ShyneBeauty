@@ -10,11 +10,15 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 - `shyne.py` contains the Flask app setup, SQLAlchemy models, Flask-Login auth
   flow, Flask-Admin registration, routes, and CLI commands.
 - `/login` is a live admin sign-in flow with safe redirect handling, generic
-  credential failure messaging, remember-me support, and account lockout after
-  repeated failed attempts.
-- `/`, `/orders`, and `/tasks` are protected admin pages rendered with Jinja
-  templates. They currently show prototype/sample content rather than live
-  query-backed business data.
+  credential failure messaging, remember-me support, account lockout after
+  repeated failed attempts, and CSRF protection on POST routes.
+- `/`, `/orders`, `/customers`, and `/inventory` are protected admin pages
+  rendered with Jinja templates and backed by live database queries.
+- `/add-customer`, `/add-order`, `/add-inventory`, and `/add-product` are live
+  create workflows gated by business permissions and backed by saved database
+  writes.
+- `/tasks` remains a protected prototype workflow page and is not backed by a
+  persisted task model yet.
 - `/admin/` is protected behind admin authentication and exposes registered
   business tables through Flask-Admin for local/internal development work.
 - CI runs pytest on Python 3.10 and 3.12, CodeQL analysis, dependency review
@@ -97,8 +101,8 @@ coexist with the Gitleaks workflow or replace it later.
   and CLI commands
 - `templates/`: Jinja templates for the current UI surfaces
 - `static/`: shared frontend assets such as `shyneIcon.png`
-- `tests/`: pytest coverage for auth, protected routes, CLI commands, and model
-  behavior
+- `tests/`: pytest coverage for auth, CSRF, protected routes, create workflows,
+  CLI commands, and model behavior
 - `schema.sql`: reference schema for the business tables
 - `requirements.txt`: runtime and test dependencies
 - `.github/workflows/`: CI and code-scanning workflows
