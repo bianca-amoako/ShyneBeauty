@@ -3,6 +3,7 @@ import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -35,7 +36,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -306,6 +307,19 @@ def ensure_utc(value):
 
 def normalize_email(value):
     return (value or "").strip().lower()
+
+
+def parse_non_negative_decimal(raw_value, *, field_label):
+    normalized = (raw_value or "").strip()
+    if not normalized:
+        raise ValueError(f"{field_label} is required.")
+    try:
+        value = Decimal(normalized)
+    except InvalidOperation as exc:
+        raise ValueError(f"{field_label} must be a valid number.") from exc
+    if value < 0:
+        raise ValueError(f"{field_label} cannot be negative.")
+    return value
 
 
 def is_safe_next_target(target):
@@ -1595,16 +1609,12 @@ def customers():
 @require_permission(PERMISSION_INVENTORY_VIEW)
 def inventory():
     search_query = request.args.get("search", "").strip()
-    category = request.args.get("category", "")
     stock_status = request.args.get("stock_status", "")
 
     query = Ingredient.query
 
     if search_query:
         query = query.filter(Ingredient.name.ilike(f"%{search_query}%"))
-
-    if category:
-        query = query.filter(Ingredient.category == category)
 
     if stock_status:
         if stock_status == "in_stock":
@@ -1623,7 +1633,6 @@ def inventory():
         "inventory.html",
         all_items=all_items,
         search_query=search_query,
-        selected_category=category,
         selected_stock_status=stock_status,
     )
 
@@ -1643,10 +1652,79 @@ def add_customer():
 def add_order():
     return render_template("addOrder.html")
 
-@app.route("/add-inventory")
-@login_required
+@app.route("/add-inventory", methods=["GET", "POST"])
+@require_permission(PERMISSION_INVENTORY_EDIT)
 def add_inventory():
-    return render_template("addInventoryItem.html")
+    form_data = {
+        "name": "",
+        "unit": "g",
+        "stock_quantity": "0",
+        "reorder_threshold": "0",
+        "supplier_name": "",
+        "supplier_contact": "",
+    }
+
+    if request.method == "POST":
+        form_data = {
+            "name": (request.form.get("name") or "").strip(),
+            "unit": (request.form.get("unit") or "").strip() or "g",
+            "stock_quantity": (request.form.get("stock_quantity") or "").strip(),
+            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip(),
+            "supplier_name": (request.form.get("supplier_name") or "").strip(),
+            "supplier_contact": (request.form.get("supplier_contact") or "").strip(),
+        }
+
+        errors = []
+        stock_quantity = None
+        reorder_threshold = None
+
+        if not form_data["name"]:
+            errors.append("Item name is required.")
+
+        existing_item = (
+            Ingredient.query.filter(
+                func.lower(Ingredient.name) == form_data["name"].lower()
+            ).first()
+            if form_data["name"]
+            else None
+        )
+        if existing_item:
+            errors.append("An inventory item with that name already exists.")
+
+        try:
+            stock_quantity = parse_non_negative_decimal(
+                form_data["stock_quantity"],
+                field_label="Current stock",
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        try:
+            reorder_threshold = parse_non_negative_decimal(
+                form_data["reorder_threshold"],
+                field_label="Reorder threshold",
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        if not errors:
+            ingredient = Ingredient(
+                name=form_data["name"],
+                unit=form_data["unit"],
+                stock_quantity=stock_quantity,
+                reorder_threshold=reorder_threshold,
+                supplier_name=form_data["supplier_name"] or None,
+                supplier_contact=form_data["supplier_contact"] or None,
+            )
+            db.session.add(ingredient)
+            db.session.commit()
+            flash("Inventory item created.", "success")
+            return redirect(url_for("inventory", search=form_data["name"]))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template("addInventoryItem.html", form_data=form_data)
 
 @app.route("/add-product")
 @login_required
