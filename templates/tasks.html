@@ -185,9 +185,6 @@
     </div>
     <div class="w3-col s8 w3-bar">
       <span>Welcome, <strong>{{ current_admin_label }}</strong></span><br>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-envelope"></i></a>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-user"></i></a>
-      <a href="#" class="w3-bar-item w3-button"><i class="fa fa-cog"></i></a>
       <form method="post" action="{{ url_for('logout') }}" class="sb-logout-form">
         <button type="submit" class="w3-button sb-logout-button">
           <i class="fa fa-sign-out"></i> Log out
@@ -214,7 +211,7 @@
       <i class="fa fa-shopping-bag fa-fw"></i> Manage Orders
     </a>
 
-    <a href="#" class="w3-bar-item w3-button w3-padding">
+    <a href="{{ url_for('inventory') }}" class="w3-bar-item w3-button w3-padding">
       <i class="fa fa-cubes fa-fw"></i> Inventory
     </a>
 
@@ -222,13 +219,7 @@
       <i class="fa fa-users fa-fw"></i> Customers
     </a>
 
-    <a href="#" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-line-chart fa-fw"></i> Reports
-    </a>
-
-    <a href="#" class="w3-bar-item w3-button w3-padding">
-      <i class="fa fa-cog fa-fw"></i> Settings
-    </a><br><br>
+    <br><br>
   </div>
 </nav>
 
