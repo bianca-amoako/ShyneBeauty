@@ -142,6 +142,16 @@ def test_routes_are_registered(app):
     assert "/logout" in routes
 
 
+def test_tasks_route_discloses_prototype_status(client, admin_user, login):
+    login(client)
+
+    response = client.get("/tasks")
+
+    assert response.status_code == 200
+    assert b"This page is still a prototype." in response.data
+    assert b"Prototype only" in response.data
+
+
 def test_init_db_cli_command_creates_tables_and_reports_success(app):
     runner = app.test_cli_runner()
     result = runner.invoke(args=["init-db"])
@@ -262,6 +272,21 @@ def test_init_db_cli_command_replaces_existing_auth_and_business_data(app):
         assert Customer.query.filter_by(email="legacy.customer@example.com").count() == 0
         assert AdminUser.query.count() == 4
         assert Customer.query.count() == 4
+
+
+def test_init_live_db_cli_command_creates_schema_without_demo_data(app):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(args=["init-live-db"])
+
+    assert result.exit_code == 0
+    assert "without demo data" in result.output
+
+    with app.app_context():
+        assert AdminUser.query.count() == 0
+        assert Customer.query.count() == 0
+        inspector = inspect(db.engines["auth"])
+        assert "admin_users" in inspector.get_table_names()
 
 
 def test_init_db_cli_command_adds_customer_source_column_to_existing_table(app):
