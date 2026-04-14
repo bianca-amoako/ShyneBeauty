@@ -3,7 +3,7 @@
 {% block title %}Add New{% endblock %}
 {% block page_title %}Add New{% endblock %}
 {% block page_description %}
-  <p>Choose which draft input layout to review for future data-entry work.</p>
+  <p>Choose a live create workflow for the records you can manage from this account.</p>
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
@@ -11,30 +11,18 @@
 
 {% block content %}
   <section class="sb-card-grid">
-    <a class="sb-link-card" href="{{ url_for('add_customer') }}">
-      <h2>Add Customer</h2>
-      <p>Draft layout for capturing customer contact details and notes.</p>
-    </a>
-    <a class="sb-link-card" href="{{ url_for('add_order') }}">
-      <h2>Add Order</h2>
-      <p>Draft layout for entering source, line items, and order totals.</p>
-    </a>
-    <a class="sb-link-card" href="{{ url_for('add_inventory') }}">
-      <h2>Add Inventory Item</h2>
-      <p>Draft layout for entering ingredient and supply records.</p>
-    </a>
-    <a class="sb-link-card" href="{{ url_for('add_product') }}">
-      <h2>Add Product</h2>
-      <p>Add a new product so it can be selected when creating customer orders.</p>
-    </a>
+    {% for item in add_flow_items %}
+      <a class="sb-link-card" href="{{ url_for(item.endpoint) }}">
+        <h2>{{ item.label }}</h2>
+        <p>{{ item.description }}</p>
+      </a>
+    {% endfor %}
   </section>
 
   <section class="sb-panel">
-    <h2>Current State</h2>
+    <h2>Available Workflows</h2>
     <p class="sb-section-note">
-      These pages now share the same authenticated shell as the live business
-      routes, but the dedicated add flows are still presentation and layout
-      prototypes rather than saved workflows.
+      This menu only shows the create workflows your current role can use. Each page saves directly to the live business database.
     </p>
   </section>
 {% endblock %}

@@ -155,6 +155,11 @@ def test_routes_are_registered(app):
     assert "/orders" in routes
     assert "/customers" in routes
     assert "/inventory" in routes
+    assert "/add-new" in routes
+    assert "/add-customer" in routes
+    assert "/add-order" in routes
+    assert "/add-inventory" in routes
+    assert "/add-product" in routes
     assert "/users" in routes
     assert "/change-password" in routes
     assert "/tasks" in routes

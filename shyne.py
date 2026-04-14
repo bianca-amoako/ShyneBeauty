@@ -2,7 +2,8 @@ import json
 import os
 import secrets
 import string
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -35,7 +36,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -212,6 +213,8 @@ ADMIN_ACCESS_EVENT_STATUS_CHANGED = "account.status_changed"
 ADMIN_ACCESS_EVENT_ACCESS_DENIED = "access.denied"
 CUSTOMER_SOURCE_OPTIONS = ("Fiverr", "Square", "Manual Entry")
 GOOGLE_SHEETS_ORDER_SOURCE = "Google Sheets"
+ORDER_PLATFORM_OPTIONS = ("Fiverr", "Square", GOOGLE_SHEETS_ORDER_SOURCE, "Direct")
+ORDER_STATUS_OPTIONS = ("Placed", "Ready", "Completed")
 SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
@@ -306,6 +309,19 @@ def ensure_utc(value):
 
 def normalize_email(value):
     return (value or "").strip().lower()
+
+
+def parse_non_negative_decimal(raw_value, *, field_label):
+    normalized = (raw_value or "").strip()
+    if not normalized:
+        raise ValueError(f"{field_label} is required.")
+    try:
+        value = Decimal(normalized)
+    except InvalidOperation as exc:
+        raise ValueError(f"{field_label} must be a valid number.") from exc
+    if value < 0:
+        raise ValueError(f"{field_label} cannot be negative.")
+    return value
 
 
 def is_safe_next_target(target):
@@ -991,6 +1007,43 @@ def has_permission(permission_key, admin_user=None, *, now=None):
     return permission_key in get_effective_permissions(target_user)
 
 
+def has_any_permission(*permission_keys, admin_user=None, now=None):
+    return any(
+        has_permission(permission_key, admin_user=admin_user, now=now)
+        for permission_key in permission_keys
+    )
+
+
+def build_add_flow_items(admin_user=None):
+    target_user = admin_user or current_user
+    return [
+        {
+            "endpoint": "add_customer",
+            "label": "Add Customer",
+            "description": "Create a customer record with contact and address details.",
+            "visible": has_permission(PERMISSION_CUSTOMERS_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_order",
+            "label": "Add Order",
+            "description": "Create an order for an existing customer with line items and an initial status.",
+            "visible": has_permission(PERMISSION_ORDERS_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_inventory",
+            "label": "Add Inventory Item",
+            "description": "Create an ingredient or supply record for stock and reorder tracking.",
+            "visible": has_permission(PERMISSION_INVENTORY_EDIT, admin_user=target_user),
+        },
+        {
+            "endpoint": "add_product",
+            "label": "Add Product",
+            "description": "Create a product so it can be used in future order entry.",
+            "visible": has_permission(PERMISSION_PRODUCTION_EDIT, admin_user=target_user),
+        },
+    ]
+
+
 def is_superadmin(admin_user=None):
     target_user = admin_user or current_user
     return getattr(target_user, "is_authenticated", False) and (
@@ -1328,6 +1381,7 @@ def inject_current_admin_label():
     if current_user.is_authenticated:
         label = current_user.full_name or current_user.email
         role_label = current_user.get_role()
+        add_flow_items = build_add_flow_items(current_user)
         nav_items = [
             {
                 "endpoint": "index",
@@ -1352,12 +1406,12 @@ def inject_current_admin_label():
             {
                 "endpoint": "add_new",
                 "label": "Add New",
-                "visible": True,
+                "visible": any(item["visible"] for item in add_flow_items),
             },
             {
                 "endpoint": "add_product",
                 "label": "Add Product",
-                "visible": True,
+                "visible": has_permission(PERMISSION_PRODUCTION_EDIT),
             },
             {
                 "endpoint": "tasks",
@@ -1374,6 +1428,9 @@ def inject_current_admin_label():
         "current_admin_label": label,
         "current_admin_role_label": role_label,
         "authenticated_nav_items": [item for item in nav_items if item["visible"]],
+        "add_flow_items": [item for item in build_add_flow_items() if item["visible"]]
+        if current_user.is_authenticated
+        else [],
     }
 
 
@@ -1556,6 +1613,8 @@ def orders():
         search_query=search_query,
         selected_source=source,
         selected_status=status,
+        order_platform_options=ORDER_PLATFORM_OPTIONS,
+        order_status_options=ORDER_STATUS_OPTIONS,
     )
 
 
@@ -1595,16 +1654,12 @@ def customers():
 @require_permission(PERMISSION_INVENTORY_VIEW)
 def inventory():
     search_query = request.args.get("search", "").strip()
-    category = request.args.get("category", "")
     stock_status = request.args.get("stock_status", "")
 
     query = Ingredient.query
 
     if search_query:
         query = query.filter(Ingredient.name.ilike(f"%{search_query}%"))
-
-    if category:
-        query = query.filter(Ingredient.category == category)
 
     if stock_status:
         if stock_status == "in_stock":
@@ -1623,7 +1678,6 @@ def inventory():
         "inventory.html",
         all_items=all_items,
         search_query=search_query,
-        selected_category=category,
         selected_stock_status=stock_status,
     )
 
@@ -1631,144 +1685,435 @@ def inventory():
 @app.route("/add-new")
 @login_required
 def add_new():
+    if not has_any_permission(
+        PERMISSION_CUSTOMERS_EDIT,
+        PERMISSION_ORDERS_EDIT,
+        PERMISSION_INVENTORY_EDIT,
+        PERMISSION_PRODUCTION_EDIT,
+    ):
+        log_admin_access_event(
+            actor=current_user,
+            target=current_user,
+            event_type=ADMIN_ACCESS_EVENT_ACCESS_DENIED,
+            outcome=ADMIN_ACCESS_EVENT_OUTCOME_DENIED,
+            note=f"{request.method} {request.path}",
+        )
+        db.session.commit()
+        return (
+            render_template(
+                "access_denied.html",
+                page_title="Add workflows denied",
+                denial_message="You do not have permission to create business records from this menu.",
+            ),
+            403,
+        )
+
     return render_template("AddNew.html")
 
 @app.route("/add-customer", methods=["GET", "POST"])
-@login_required
+@require_permission(PERMISSION_CUSTOMERS_EDIT)
 def add_customer():
+    form_data = {
+        "first_name": "",
+        "last_name": "",
+        "source": "",
+        "email": "",
+        "phone": "",
+        "country": "USA",
+        "street_address": "",
+        "city": "",
+        "state": "",
+        "postal_code": "",
+    }
+
     if request.method == "POST":
-        first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        street_address = request.form.get('street_address')
-        city = request.form.get('city')
-        state = request.form.get('state')
-        postal_code = request.form.get('postal_code')
-        country = request.form.get('country') or "USA"
-        source = request.form.get('source')
-        
-        if not first_name or not last_name or not email:
-            flash("First name, last name, and email are required.", "error")
-            return render_template("add_customer.html")
-        
-        existing_customer = Customer.query.filter_by(email=email).first()
-        if existing_customer:
-            flash(f"Customer with email {email} already exists.", "error")
-            return render_template("add_customer.html")
+        form_data = {
+            "first_name": (request.form.get("first_name") or "").strip(),
+            "last_name": (request.form.get("last_name") or "").strip(),
+            "source": (request.form.get("source") or "").strip(),
+            "email": normalize_email(request.form.get("email")),
+            "phone": (request.form.get("phone") or "").strip(),
+            "country": (request.form.get("country") or "").strip() or "USA",
+            "street_address": (request.form.get("street_address") or "").strip(),
+            "city": (request.form.get("city") or "").strip(),
+            "state": (request.form.get("state") or "").strip(),
+            "postal_code": (request.form.get("postal_code") or "").strip(),
+        }
 
-        new_customer = Customer(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone=phone,
-            street_address=street_address,
-            city=city,
-            state=state,
-            postal_code=postal_code,
-            country=country,
-            source=source
-        )
-        try:
-            db.session.add(new_customer)
-            db.session.commit()
-            flash(f"Customer {first_name} {last_name} added successfully!", "success")
-            return redirect(url_for('customers'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error adding customer: {str(e)}", "error")
-            return render_template("add_customer.html")
+        errors = []
+        if not form_data["first_name"]:
+            errors.append("First name is required.")
+        if not form_data["last_name"]:
+            errors.append("Last name is required.")
+        if not form_data["email"]:
+            errors.append("Email is required.")
 
-    return render_template("addCustomer.html")
+        existing_customer = None
+        if form_data["email"]:
+            existing_customer = Customer.query.filter(
+                func.lower(Customer.email) == form_data["email"]
+            ).first()
+            if existing_customer:
+                errors.append("A customer with that email already exists.")
+
+        if not errors:
+            customer = Customer(
+                first_name=form_data["first_name"],
+                last_name=form_data["last_name"],
+                email=form_data["email"],
+                phone=form_data["phone"] or None,
+                street_address=form_data["street_address"] or None,
+                city=form_data["city"] or None,
+                state=form_data["state"] or None,
+                postal_code=form_data["postal_code"] or None,
+                country=form_data["country"],
+                source=form_data["source"] or None,
+            )
+            try:
+                db.session.add(customer)
+                db.session.commit()
+            except ValueError as exc:
+                db.session.rollback()
+                errors.append(str(exc))
+
+        if errors:
+            for error in errors:
+                flash(error, "error")
+        else:
+            flash("Customer created.", "success")
+            return redirect(url_for("customers", search=form_data["email"]))
+
+    return render_template(
+        "addCustomer.html",
+        form_data=form_data,
+        source_options=CUSTOMER_SOURCE_OPTIONS,
+    )
 
 @app.route("/add-order", methods=["GET", "POST"])
-@login_required
+@require_permission(PERMISSION_ORDERS_EDIT)
 def add_order():
-        if request.method == "POST":
-            customer_id = request.form.get('customer_id')
-            platform = request.form.get('platform')
-            status = request.form.get('status')
-            placed_at_str = request.form.get('placed_at')
-        
+    customers = Customer.query.order_by(Customer.last_name, Customer.first_name).all()
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
 
-            product_ids = request.form.getlist('product_id[]')
-            quantities = request.form.getlist('quantity[]')
-        
-            if not order_number or not customer_id or not platform:
-                flash("Order number, customer, and platform are required.", "error")
-                return redirect(url_for('add_order'))
-        
-            if not product_ids or not product_ids[0]:
-                flash("At least one product is required.", "error")
-                return redirect(url_for('add_order'))
-        
-            placed_at = datetime.strptime(placed_at_str, '%Y-%m-%d') if placed_at_str else utc_now()
-            
-            total_amount = Decimal('0.00')
-            order_items_data = []
-            
-            for i, product_id in enumerate(product_ids):
-                if product_id:
-                    quantity = int(quantities[i]) if i < len(quantities) else 1
-                    product = Product.query.get(product_id)
-                    if product:
-                        item_total = product.price * quantity
-                        total_amount += item_total
-                        order_items_data.append({
-                            'product_id': product_id,
-                            'quantity': quantity,
-                            'unit_price': product.price
-                        })
-            
-            new_order = Order(
-                customer_id=customer_id,
-                platform=platform,
-                status=status,
-                total_amount=total_amount,
-                placed_at=placed_at,
-                updated_at=utc_now()
+    form_data = {
+        "order_number": "",
+        "customer_id": "",
+        "platform": "Direct",
+        "status": "Placed",
+        "placed_at": datetime.now(timezone.utc).date().isoformat(),
+    }
+    line_items = [{"product_id": "", "quantity": "1", "unit_price": ""}]
+
+    if request.method == "POST":
+        form_data = {
+            "order_number": (request.form.get("order_number") or "").strip(),
+            "customer_id": (request.form.get("customer_id") or "").strip(),
+            "platform": (request.form.get("platform") or "").strip(),
+            "status": (request.form.get("status") or "").strip(),
+            "placed_at": (request.form.get("placed_at") or "").strip(),
+        }
+        line_items = list(
+            zip(
+                request.form.getlist("product_id"),
+                request.form.getlist("quantity"),
+                request.form.getlist("unit_price"),
             )
-            
+        )
+        line_items = [
+            {
+                "product_id": (product_id or "").strip(),
+                "quantity": (quantity or "").strip(),
+                "unit_price": (unit_price or "").strip(),
+            }
+            for product_id, quantity, unit_price in line_items
+        ] or line_items
+
+        errors = []
+        customer = None
+        placed_at = None
+        parsed_line_items = []
+        total_amount = Decimal("0.00")
+
+        if not form_data["order_number"]:
+            errors.append("Order number is required.")
+        elif Order.query.filter(
+            func.lower(Order.order_number) == form_data["order_number"].lower()
+        ).first():
+            errors.append("An order with that number already exists.")
+
+        if not form_data["customer_id"]:
+            errors.append("Customer is required.")
+        else:
             try:
-                db.session.add(new_order)
-                db.session.flush()
-                
-                for item in order_items_data:
-                    order_item = OrderItem(
-                        order_id=new_order.id,
-                        product_id=item['product_id'],
-                        quantity=item['quantity'],
-                        unit_price=item['unit_price']
+                customer = db.session.get(Customer, int(form_data["customer_id"]))
+            except ValueError:
+                customer = None
+            if customer is None:
+                errors.append("Select a valid customer.")
+
+        if form_data["platform"] not in ORDER_PLATFORM_OPTIONS:
+            errors.append("Order source must be a supported platform.")
+
+        if form_data["status"] not in ORDER_STATUS_OPTIONS:
+            errors.append("Status must be Placed, Ready, or Completed.")
+
+        if not form_data["placed_at"]:
+            errors.append("Order date is required.")
+        else:
+            try:
+                placed_at = datetime.strptime(
+                    form_data["placed_at"], "%Y-%m-%d"
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                errors.append("Order date must be a valid date.")
+
+        active_line_items = [
+            item
+            for item in line_items
+            if item["product_id"] or item["quantity"] or item["unit_price"]
+        ]
+        if not active_line_items:
+            errors.append("Add at least one line item.")
+
+        product_lookup = {product.id: product for product in products}
+        for index, item in enumerate(active_line_items, start=1):
+            product = None
+            quantity = None
+            unit_price = None
+
+            try:
+                product = product_lookup.get(int(item["product_id"]))
+            except ValueError:
+                product = None
+            if product is None:
+                errors.append(f"Line item {index} must use a valid product.")
+
+            try:
+                quantity = int(item["quantity"])
+                if quantity <= 0:
+                    raise ValueError
+            except ValueError:
+                errors.append(f"Line item {index} quantity must be a positive whole number.")
+
+            try:
+                unit_price = Decimal(item["unit_price"])
+                if unit_price < 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                errors.append(f"Line item {index} price must be a valid non-negative amount.")
+
+            if product is not None and quantity is not None and unit_price is not None:
+                parsed_line_items.append(
+                    {
+                        "product": product,
+                        "quantity": quantity,
+                        "unit_price": unit_price,
+                    }
+                )
+                total_amount += unit_price * quantity
+
+        if not errors:
+            order = Order(
+                customer=customer,
+                order_number=form_data["order_number"],
+                platform=form_data["platform"],
+                total_amount=total_amount,
+                status=form_data["status"],
+                placed_at=placed_at,
+            )
+            db.session.add(order)
+            db.session.flush()
+
+            for item in parsed_line_items:
+                db.session.add(
+                    OrderItem(
+                        order=order,
+                        product=item["product"],
+                        quantity=item["quantity"],
+                        unit_price=item["unit_price"],
                     )
-                    db.session.add(order_item)
-                
-                db.session.commit()
-                flash(f"Order {order_number} created successfully!", "success")
-                return redirect(url_for('orders'))
-                
-            except Exception as e:
-                db.session.rollback()
-                flash(f"Error creating order: {str(e)}", "error")
-                return redirect(url_for('add_order'))
-        
-        customers = Customer.query.order_by(Customer.first_name).all()
-        products = Product.query.filter_by(active=True).order_by(Product.name).all()
-        today = date.today().isoformat()
-    
-        return render_template("addOrder.html", 
-                             customers=customers, 
-                             products=products,
-                             today=today)
+                )
 
-@app.route("/add-inventory")
-@login_required
+            db.session.add(
+                OrderStatusEvent(
+                    order=order,
+                    event_status=form_data["status"],
+                    message="Initial status recorded on order creation.",
+                )
+            )
+            db.session.commit()
+            flash("Order created.", "success")
+            return redirect(url_for("orders", search=order.order_number))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template(
+        "addOrder.html",
+        form_data=form_data,
+        customers=customers,
+        products=products,
+        line_items=line_items,
+        order_platform_options=ORDER_PLATFORM_OPTIONS,
+        order_status_options=ORDER_STATUS_OPTIONS,
+    )
+
+@app.route("/add-inventory", methods=["GET", "POST"])
+@require_permission(PERMISSION_INVENTORY_EDIT)
 def add_inventory():
-    return render_template("addInventoryItem.html")
+    form_data = {
+        "name": "",
+        "unit": "g",
+        "stock_quantity": "0",
+        "reorder_threshold": "0",
+        "supplier_name": "",
+        "supplier_contact": "",
+    }
 
-@app.route("/add-product")
-@login_required
+    if request.method == "POST":
+        form_data = {
+            "name": (request.form.get("name") or "").strip(),
+            "unit": (request.form.get("unit") or "").strip() or "g",
+            "stock_quantity": (request.form.get("stock_quantity") or "").strip(),
+            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip(),
+            "supplier_name": (request.form.get("supplier_name") or "").strip(),
+            "supplier_contact": (request.form.get("supplier_contact") or "").strip(),
+        }
+
+        errors = []
+        stock_quantity = None
+        reorder_threshold = None
+
+        if not form_data["name"]:
+            errors.append("Item name is required.")
+
+        existing_item = (
+            Ingredient.query.filter(
+                func.lower(Ingredient.name) == form_data["name"].lower()
+            ).first()
+            if form_data["name"]
+            else None
+        )
+        if existing_item:
+            errors.append("An inventory item with that name already exists.")
+
+        try:
+            stock_quantity = parse_non_negative_decimal(
+                form_data["stock_quantity"],
+                field_label="Current stock",
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        try:
+            reorder_threshold = parse_non_negative_decimal(
+                form_data["reorder_threshold"],
+                field_label="Reorder threshold",
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        if not errors:
+            ingredient = Ingredient(
+                name=form_data["name"],
+                unit=form_data["unit"],
+                stock_quantity=stock_quantity,
+                reorder_threshold=reorder_threshold,
+                supplier_name=form_data["supplier_name"] or None,
+                supplier_contact=form_data["supplier_contact"] or None,
+            )
+            db.session.add(ingredient)
+            db.session.commit()
+            flash("Inventory item created.", "success")
+            return redirect(url_for("inventory", search=form_data["name"]))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template("addInventoryItem.html", form_data=form_data)
+
+@app.route("/add-product", methods=["GET", "POST"])
+@require_permission(PERMISSION_PRODUCTION_EDIT)
 def add_product():
-    return render_template("addProduct.html")
+    form_data = {
+        "name": "",
+        "sku": "",
+        "status": "Active",
+        "price": "",
+        "reorder_threshold": "0",
+        "description": "",
+    }
+    created_product = None
+    created_sku = (request.args.get("created") or "").strip()
+
+    if created_sku:
+        created_product = Product.query.filter_by(sku=created_sku).first()
+
+    if request.method == "POST":
+        form_data = {
+            "name": (request.form.get("name") or "").strip(),
+            "sku": (request.form.get("sku") or "").strip(),
+            "status": (request.form.get("status") or "").strip() or "Active",
+            "price": (request.form.get("price") or "").strip(),
+            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip(),
+            "description": (request.form.get("description") or "").strip(),
+        }
+
+        errors = []
+        price = None
+        reorder_threshold = None
+
+        if not form_data["name"]:
+            errors.append("Product name is required.")
+        if not form_data["sku"]:
+            errors.append("SKU is required.")
+
+        if form_data["sku"]:
+            existing_product = Product.query.filter(
+                func.lower(Product.sku) == form_data["sku"].lower()
+            ).first()
+            if existing_product:
+                errors.append("A product with that SKU already exists.")
+
+        try:
+            price = Decimal(form_data["price"])
+            if price < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            errors.append("Price must be a valid non-negative amount.")
+
+        try:
+            reorder_threshold = int(form_data["reorder_threshold"])
+            if reorder_threshold < 0:
+                raise ValueError
+        except ValueError:
+            errors.append("Reorder threshold must be a non-negative whole number.")
+
+        if form_data["status"] not in {"Active", "Inactive"}:
+            errors.append("Status must be Active or Inactive.")
+
+        if not errors:
+            product = Product(
+                name=form_data["name"],
+                sku=form_data["sku"],
+                description=form_data["description"] or None,
+                price=price,
+                active=form_data["status"] == "Active",
+                reorder_threshold=reorder_threshold,
+            )
+            db.session.add(product)
+            db.session.commit()
+            flash("Product created.", "success")
+            return redirect(url_for("add_product", created=product.sku))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template(
+        "addProduct.html",
+        form_data=form_data,
+        created_product=created_product,
+    )
     
 @app.route("/users")
 @require_permission(

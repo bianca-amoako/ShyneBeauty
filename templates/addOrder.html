@@ -1,136 +1,150 @@
 {% extends "base_authenticated.html" %}
+{% from "_form_helpers.html" import csrf_input %}
 
 {% block title %}Add Order{% endblock %}
-
 {% block page_title %}Add Order{% endblock %}
-
 {% block page_description %}
-  <p>Enter new order information below.</p>
+  <p>Create an order for an existing customer and record the initial fulfillment status.</p>
 {% endblock %}
-
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
-  <a class="sb-button" href="{{ url_for('orders') }}">Open live orders page</a>
+  <a class="sb-button" href="{{ url_for('orders') }}">View orders</a>
 {% endblock %}
 
 {% block content %}
-  <div class="sb-panel">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <form method="post" action="{{ url_for('add_order') }}" id="orderForm">
-      <!-- Order Information -->
-      <label><b>Customer *</b></label>
-      <select class="w3-select w3-border w3-margin-bottom" name="customer_id" required>
-        <option value="">Select Customer</option>
-        {% for customer in customers %}
-          <option value="{{ customer.id }}">{{ customer.first_name }} {{ customer.last_name }} - {{ customer.email }}</option>
-        {% endfor %}
-      </select>
-
-      <label><b>Platform/Source *</b></label>
-      <select class="w3-select w3-border w3-margin-bottom" name="platform" required>
-        <option value="">Select Source</option>
-        <option value="Fiverr">Fiverr</option>
-        <option value="Square">Square</option>
-        <option value="Google Sheets">Google Sheets</option>
-      </select>
-
-      <label><b>Status</b></label>
-      <select class="w3-select w3-border w3-margin-bottom" name="status">
-        <option value="New">New</option>
-        <option value="In Progress">In Progress</option>
-        <option value="Waiting for Ingredients">Waiting for Ingredients</option>
-        <option value="Packed">Packed</option>
-        <option value="Shipped">Shipped</option>
-        <option value="Completed">Completed</option>
-      </select>
-
-      <label><b>Order Date</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="date" name="placed_at" value="{{ today }}">
-
-      <!-- Products Section -->
-      <label><b>Products</b></label>
-      <div id="products-container">
-        <div class="product-row" id="product-1">
-          <div class="w3-row-padding">
-            <div class="w3-half">
-              <label>Product</label>
-              <select class="w3-select w3-border" name="product_id[]" required>
-                <option value="">Select Product</option>
-                {% for product in products %}
-                  <option value="{{ product.id }}">{{ product.name }} (SKU: {{ product.sku }}) - ${{ "%.2f"|format(product.price) }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="w3-third">
-              <label>Quantity</label>
-              <input class="w3-input w3-border" type="number" name="quantity[]" value="1" min="1" required>
-            </div>
-            <div class="w3-sixth">
-              <label>&nbsp;</label>
-              <button type="button" class="w3-button sb-button-danger" onclick="removeProduct(1)" style="display:none">Remove</button>
-            </div>
-          </div>
+  <section class="sb-panel">
+    <h2>Order details</h2>
+    {% if not customers %}
+      <p class="sb-section-note">Create a customer record first so the order can be linked to an existing customer.</p>
+    {% endif %}
+    {% if not products %}
+      <p class="sb-section-note">Create at least one active product before creating an order.</p>
+    {% endif %}
+    <form class="sb-form-grid" method="post" action="{{ url_for('add_order') }}" novalidate>
+      {{ csrf_input() }}
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="order-number" name="order_number" type="text" placeholder=" " value="{{ form_data.order_number }}" required>
+          <label for="order-number">Order ID</label>
         </div>
-      </div>
-
-      <button type="button" class="w3-button sb-button add-product-btn" onclick="addProduct()">
-        <i class="fa fa-plus"></i> Add Another Product
-      </button>
-
-      <div class="w3-margin-top">
-        <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Order</button>
-        <a href="/orders" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
-      </div>
-    </form>
-  </div>
-
-  <script>
-    let productCount = 1;
-
-    function addProduct() {
-      productCount++;
-      const container = document.getElementById('products-container');
-      const newProduct = document.createElement('div');
-      newProduct.className = 'product-row';
-      newProduct.id = `product-${productCount}`;
-      newProduct.innerHTML = `
-        <div class="w3-row-padding">
-          <div class="w3-half">
-            <label>Product</label>
-            <select class="w3-select w3-border" name="product_id[]" required>
-              <option value="">Select Product</option>
-              {% for product in products %}
-                <option value="{{ product.id }}">{{ product.name }} (SKU: {{ product.sku }}) - ${{ "%.2f"|format(product.price) }}</option>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="order-customer">Customer</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="order-customer" name="customer_id" required>
+              <option value="">Select customer</option>
+              {% for customer in customers %}
+                <option value="{{ customer.id }}" {% if form_data.customer_id == customer.id|string %}selected{% endif %}>
+                  {{ customer.first_name }} {{ customer.last_name }}{% if customer.email %} ({{ customer.email }}){% endif %}
+                </option>
               {% endfor %}
             </select>
-          </div>
-          <div class="w3-third">
-            <label>Quantity</label>
-            <input class="w3-input w3-border" type="number" name="quantity[]" value="1" min="1" required>
-          </div>
-          <div class="w3-sixth">
-            <label>&nbsp;</label>
-            <button type="button" class="w3-button sb-button-danger" onclick="removeProduct(${productCount})">Remove</button>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
           </div>
         </div>
-      `;
-      container.appendChild(newProduct);
-    }
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="order-source">Order Source</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="order-source" name="platform">
+              {% for platform in order_platform_options %}
+                <option value="{{ platform }}" {% if form_data.platform == platform %}selected{% endif %}>{{ platform }}</option>
+              {% endfor %}
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="order-status">Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="order-status" name="status">
+              {% for status in order_status_options %}
+                <option value="{{ status }}" {% if form_data.status == status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input sb-input-always-float" id="order-date" name="placed_at" type="date" value="{{ form_data.placed_at }}" required>
+          <label for="order-date">Order Date</label>
+        </div>
+      </div>
+      <section class="sb-panel" style="margin-top: 16px;">
+        <h3>Line items</h3>
+        <p class="sb-section-note">Totals are calculated automatically from quantity and unit price.</p>
+        <div id="line-items">
+          {% for item in line_items %}
+            <div class="sb-form-row order-line-item">
+              <div class="sb-field sb-field-select">
+                <label class="sb-label-above">Product</label>
+                <div class="sb-select-wrap">
+                  <select class="sb-select" name="product_id">
+                    <option value="">Select product</option>
+                    {% for product in products %}
+                      <option value="{{ product.id }}" {% if item.product_id == product.id|string %}selected{% endif %}>
+                        {{ product.name }} ({{ product.sku }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <span class="sb-select-arrow" aria-hidden="true"></span>
+                </div>
+              </div>
+              <div class="sb-field sb-field-float">
+                <input class="sb-input sb-input-always-float" name="quantity" type="number" min="1" placeholder=" " value="{{ item.quantity }}">
+                <label>Quantity</label>
+              </div>
+              <div class="sb-field sb-field-float">
+                <input class="sb-input" name="unit_price" type="text" inputmode="decimal" placeholder=" " value="{{ item.unit_price }}">
+                <label>Unit Price</label>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        <button class="sb-button-secondary" type="button" id="add-line-item">Add line item</button>
+      </section>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit" {% if not customers or not products %}disabled{% endif %}>Create order</button>
+        <a class="sb-button-secondary" href="{{ url_for('orders') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}
 
-    function removeProduct(id) {
-      const productDiv = document.getElementById(`product-${id}`);
-      if (productDiv) {
-        productDiv.remove();
-      }
+{% block scripts %}
+  <template id="order-line-item-template">
+    <div class="sb-form-row order-line-item">
+      <div class="sb-field sb-field-select">
+        <label class="sb-label-above">Product</label>
+        <div class="sb-select-wrap">
+          <select class="sb-select" name="product_id">
+            <option value="">Select product</option>
+            {% for product in products %}
+              <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>
+            {% endfor %}
+          </select>
+          <span class="sb-select-arrow" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="sb-field sb-field-float">
+        <input class="sb-input sb-input-always-float" name="quantity" type="number" min="1" placeholder=" " value="1">
+        <label>Quantity</label>
+      </div>
+      <div class="sb-field sb-field-float">
+        <input class="sb-input" name="unit_price" type="text" inputmode="decimal" placeholder=" ">
+        <label>Unit Price</label>
+      </div>
+    </div>
+  </template>
+  <script>
+    const lineItems = document.getElementById("line-items");
+    const addLineItemButton = document.getElementById("add-line-item");
+    const lineItemTemplate = document.getElementById("order-line-item-template");
+
+    if (lineItems && addLineItemButton && lineItemTemplate) {
+      addLineItemButton.addEventListener("click", () => {
+        lineItems.appendChild(lineItemTemplate.content.cloneNode(true));
+      });
     }
   </script>
 {% endblock %}
