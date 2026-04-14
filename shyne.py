@@ -33,6 +33,7 @@ from flask_login import (
     logout_user,
 )
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
 from sqlalchemy import inspect, or_, text
 from sqlalchemy.exc import OperationalError
@@ -283,8 +284,10 @@ app.config["SESSION_COOKIE_SECURE"] = env_flag("SESSION_COOKIE_SECURE", default=
 app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 app.config["REMEMBER_COOKIE_SECURE"] = app.config["SESSION_COOKIE_SECURE"]
+app.config["WTF_CSRF_ENABLED"] = True
 
 db = SQLAlchemy(app)
+csrf = CSRFProtect(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Please sign in to continue."
@@ -341,6 +344,28 @@ def redirect_to_safe_next(target, *, fallback_endpoint="index"):
     if safe_target:
         return redirect(safe_target)
     return redirect(url_for(fallback_endpoint))
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    flash(error.description or "Invalid CSRF token.", "error")
+
+    if request.endpoint == "login":
+        return render_template(
+            "login.html",
+            form_data={"email": "", "remember_me": False},
+            next_url=get_safe_next_target(request.args.get("next")),
+            show_dev_test_admin_hint=dev_test_admin_enabled(),
+            dev_test_admin_seeded=dev_test_admin_seeded(),
+        ), 400
+
+    if request.endpoint == "change_password":
+        return render_template(
+            "change_password.html",
+            next_url=get_safe_next_target(request.args.get("next")),
+        ), 400
+
+    return redirect(request.referrer or url_for("index"))
 
 
 def current_request_next_target():
@@ -1330,6 +1355,11 @@ def inject_current_admin_label():
                 "visible": True,
             },
             {
+                "endpoint": "add_product",
+                "label": "Add Product",
+                "visible": True,
+            },
+            {
                 "endpoint": "tasks",
                 "label": "Tasks",
                 "visible": has_permission(PERMISSION_TASKS_VIEW),
@@ -1564,45 +1594,44 @@ def customers():
 @app.route("/inventory")
 @require_permission(PERMISSION_INVENTORY_VIEW)
 def inventory():
-    search_query = request.args.get('search', '').strip()
-    category = request.args.get('category', '')
-    stock_status = request.args.get('stock_status', '')
+    search_query = request.args.get("search", "").strip()
+    category = request.args.get("category", "")
+    stock_status = request.args.get("stock_status", "")
 
     query = Ingredient.query
-    
 
     if search_query:
-        query = query.filter(Ingredient.name.ilike(f'%{search_query}%'))
+        query = query.filter(Ingredient.name.ilike(f"%{search_query}%"))
 
     if category:
         query = query.filter(Ingredient.category == category)
-    
 
     if stock_status:
-        if stock_status == 'in_stock':
+        if stock_status == "in_stock":
             query = query.filter(Ingredient.stock_quantity > Ingredient.reorder_threshold)
-        elif stock_status == 'low_stock':
+        elif stock_status == "low_stock":
             query = query.filter(
                 Ingredient.stock_quantity <= Ingredient.reorder_threshold,
-                Ingredient.stock_quantity > 0
+                Ingredient.stock_quantity > 0,
             )
-        elif stock_status == 'out_of_stock':
+        elif stock_status == "out_of_stock":
             query = query.filter(Ingredient.stock_quantity == 0)
-    
+
     all_items = query.order_by(Ingredient.name).all()
-    
-    return render_template("inventory.html", 
-                         all_items=all_items,
-                         search_query=search_query,
-                         selected_category=category,
-                         selected_stock_status=stock_status,
-                          )
-    
-    
+
+    return render_template(
+        "inventory.html",
+        all_items=all_items,
+        search_query=search_query,
+        selected_category=category,
+        selected_stock_status=stock_status,
+    )
+
+
 @app.route("/add-new")
 @login_required
 def add_new():
-    return render_template("addNew.html")
+    return render_template("AddNew.html")
 
 @app.route("/add-customer", methods=["GET", "POST"])
 @login_required
@@ -1735,6 +1764,11 @@ def add_order():
 @login_required
 def add_inventory():
     return render_template("addInventoryItem.html")
+
+@app.route("/add-product")
+@login_required
+def add_product():
+    return render_template("addProduct.html")
     
 @app.route("/users")
 @require_permission(

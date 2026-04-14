@@ -1,0 +1,63 @@
+{% extends "base_authenticated.html" %}
+
+{% block title %}Add Product{% endblock %}
+{% block page_title %}Add Product{% endblock %}
+{% block page_description %}
+  <p>Draft product-entry layout for review. This page does not save data yet.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
+  <a class="sb-button" href="{{ url_for('index') }}">Back to dashboard</a>
+{% endblock %}
+
+{% block content %}
+  <section class="sb-panel">
+    <h2>Layout Preview</h2>
+    <form class="sb-form-grid" novalidate>
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="product-name" name="name" type="text" placeholder=" ">
+          <label for="product-name">Product Name</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="product-sku" name="sku" type="text" placeholder=" ">
+          <label for="product-sku">SKU</label>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="product-status">Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="product-status" name="status">
+              <option value="" disabled selected></option>
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="product-price" name="price" type="text" inputmode="decimal" placeholder=" ">
+          <label for="product-price">Price</label>
+        </div>
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="product-reorder-threshold" name="reorder_threshold" type="number" placeholder=" ">
+          <label for="product-reorder-threshold">Reorder Threshold</label>
+        </div>
+      </div>
+      <div class="sb-field sb-field-float sb-field-textarea">
+        <textarea class="sb-textarea" id="product-description" name="description" placeholder=" "></textarea>
+        <label for="product-description">Description</label>
+      </div>
+    </form>
+  </section>
+
+  <section class="sb-panel">
+    <h2>Implementation Note</h2>
+    <p class="sb-section-note">
+      This is a draft product-entry surface only. Use it as a layout reference
+      while the live workflow remains centered on the authenticated operations
+      pages and add-menu navigation.
+    </p>
+  </section>
+{% endblock %}
