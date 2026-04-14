@@ -4,51 +4,60 @@
 {% block title %}Add Inventory Item{% endblock %}
 {% block page_title %}Add Inventory Item{% endblock %}
 {% block page_description %}
-  <p>Create an ingredient or supply record for stock tracking and reorder alerts.</p>
+  <p>Add a new ingredient or inventory item to the database.</p>
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
-  <a class="sb-button" href="{{ url_for('inventory') }}">View inventory</a>
+  <a class="sb-button" href="{{ url_for('inventory') }}">View Inventory</a>
 {% endblock %}
 
 {% block content %}
-  <section class="sb-panel">
-    <h2>Inventory details</h2>
-    <p class="sb-section-note">Use decimal quantities for stock and reorder values when needed.</p>
-    <form class="sb-form-grid" method="post" action="{{ url_for('add_inventory') }}" novalidate>
-      {{ csrf_input() }}
-      <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="inventory-item-name" name="name" type="text" placeholder=" " value="{{ form_data.name }}" required>
-          <label for="inventory-item-name">Item Name</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="inventory-unit" name="unit" type="text" placeholder=" " value="{{ form_data.unit }}" required>
-          <label for="inventory-unit">Unit</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input sb-input-always-float" id="inventory-stock" name="stock_quantity" type="text" inputmode="decimal" value="{{ form_data.stock_quantity }}" required>
-          <label for="inventory-stock">Current Stock</label>
-        </div>
-      </div>
-      <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input sb-input-always-float" id="inventory-reorder" name="reorder_threshold" type="text" inputmode="decimal" value="{{ form_data.reorder_threshold }}" required>
-          <label for="inventory-reorder">Reorder Threshold</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="inventory-supplier" name="supplier_name" type="text" placeholder=" " value="{{ form_data.supplier_name }}">
-          <label for="inventory-supplier">Supplier Name</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="inventory-contact" name="supplier_contact" type="text" placeholder=" " value="{{ form_data.supplier_contact }}">
-          <label for="inventory-contact">Supplier Contact</label>
-        </div>
-      </div>
-      <div class="sb-form-actions">
-        <button class="sb-button" type="submit">Create inventory item</button>
-        <a class="sb-button-secondary" href="{{ url_for('inventory') }}">Cancel</a>
-      </div>
+  <div class="sb-panel">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Inventory Form -->
+    <form method="post" action="{{ url_for('add_inventory') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+
+      <label><b>Item Name *</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter item name (e.g., Beeswax, Shea Butter)" required>
+
+      <label><b>Stock Quantity *</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="stock_quantity" step="0.001" placeholder="Current stock quantity" required>
+
+      <label><b>Unit *</b></label>
+      <select class="w3-select w3-border w3-margin-bottom" name="unit" required>
+        <option value="">Select Unit</option>
+        <option value="g">Grams (g)</option>
+        <option value="kg">Kilograms (kg)</option>
+        <option value="ml">Milliliters (ml)</option>
+        <option value="L">Liters (L)</option>
+        <option value="oz">Ounces (oz)</option>
+        <option value="lb">Pounds (lb)</option>
+        <option value="each">Each</option>
+        <option value="piece">Piece</option>
+      </select>
+
+      <label><b>Supplier Name</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_name" placeholder="Enter supplier name">
+
+      <label><b>Supplier Contact</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_contact" placeholder="Email or phone number">
+
+      <label><b>Reorder Threshold</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" step="0.001" placeholder="Minimum stock before reordering" value="0">
+
+      <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Inventory Item</button>
+      <a href="{{ url_for('inventory') }}" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
     </form>
-  </section>
+  </div>
 {% endblock %}

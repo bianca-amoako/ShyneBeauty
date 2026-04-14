@@ -12,47 +12,50 @@
 {% endblock %}
 
 {% block content %}
-  <section class="sb-panel">
-    <h2>Order details</h2>
-    {% if not customers %}
-      <p class="sb-section-note">Create a customer record first so the order can be linked to an existing customer.</p>
-    {% endif %}
-    {% if not products %}
-      <p class="sb-section-note">Create at least one active product before creating an order.</p>
-    {% endif %}
-    <form class="sb-form-grid" method="post" action="{{ url_for('add_order') }}" novalidate>
-      {{ csrf_input() }}
-      <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="order-number" name="order_number" type="text" placeholder=" " value="{{ form_data.order_number }}" required>
-          <label for="order-number">Order ID</label>
-        </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="order-customer">Customer</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="order-customer" name="customer_id" required>
-              <option value="">Select customer</option>
-              {% for customer in customers %}
-                <option value="{{ customer.id }}" {% if form_data.customer_id == customer.id|string %}selected{% endif %}>
-                  {{ customer.first_name }} {{ customer.last_name }}{% if customer.email %} ({{ customer.email }}){% endif %}
-                </option>
-              {% endfor %}
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
+  <div class="sb-panel">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
           </div>
-        </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="order-source">Order Source</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="order-source" name="platform">
-              {% for platform in order_platform_options %}
-                <option value="{{ platform }}" {% if form_data.platform == platform %}selected{% endif %}>{{ platform }}</option>
-              {% endfor %}
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
-          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('add_order') }}" id="orderForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- Customer Section -->
+      <div class="sb-field sb-field-select">
+        <label class="sb-label-above" for="order-customer">Customer *</label>
+        <div class="sb-select-wrap">
+          <select class="sb-select" id="order-customer" name="customer_id" required>
+            <option value="">Select customer</option>
+            {% for customer in customers %}
+              <option value="{{ customer.id }}" {% if form_data.customer_id == customer.id|string %}selected{% endif %}>
+                {{ customer.first_name }} {{ customer.last_name }}{% if customer.email %} ({{ customer.email }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <span class="sb-select-arrow" aria-hidden="true"></span>
         </div>
       </div>
+
+      <!-- Order Source -->
+      <div class="sb-field sb-field-select">
+        <label class="sb-label-above" for="order-source">Platform/Source *</label>
+        <div class="sb-select-wrap">
+          <select class="sb-select" id="order-source" name="platform" required>
+            {% for platform in order_platform_options %}
+              <option value="{{ platform }}" {% if form_data.platform == platform %}selected{% endif %}>{{ platform }}</option>
+            {% endfor %}
+          </select>
+          <span class="sb-select-arrow" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <!-- Status and Date Row -->
       <div class="sb-form-row">
         <div class="sb-field sb-field-select">
           <label class="sb-label-above" for="order-status">Status</label>
@@ -70,6 +73,8 @@
           <label for="order-date">Order Date</label>
         </div>
       </div>
+
+      <!-- Line Items Section -->
       <section class="sb-panel" style="margin-top: 16px;">
         <h3>Line items</h3>
         <p class="sb-section-note">Totals are calculated automatically from quantity and unit price.</p>
@@ -83,7 +88,7 @@
                     <option value="">Select product</option>
                     {% for product in products %}
                       <option value="{{ product.id }}" {% if item.product_id == product.id|string %}selected{% endif %}>
-                        {{ product.name }} ({{ product.sku }})
+                        {{ product.name }} ({{ product.sku }}) - ${{ "%.2f"|format(product.price) }}
                       </option>
                     {% endfor %}
                   </select>
@@ -103,12 +108,14 @@
         </div>
         <button class="sb-button-secondary" type="button" id="add-line-item">Add line item</button>
       </section>
-      <div class="sb-form-actions">
+
+      <!-- Form Actions -->
+      <div class="sb-form-actions" style="margin-top: 20px;">
         <button class="sb-button" type="submit" {% if not customers or not products %}disabled{% endif %}>Create order</button>
         <a class="sb-button-secondary" href="{{ url_for('orders') }}">Cancel</a>
       </div>
     </form>
-  </section>
+  </div>
 {% endblock %}
 
 {% block scripts %}
@@ -120,7 +127,7 @@
           <select class="sb-select" name="product_id">
             <option value="">Select product</option>
             {% for product in products %}
-              <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>
+              <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }}) - ${{ "%.2f"|format(product.price) }}</option>
             {% endfor %}
           </select>
           <span class="sb-select-arrow" aria-hidden="true"></span>

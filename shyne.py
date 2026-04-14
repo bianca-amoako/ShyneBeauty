@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
+from decimal import Decimal
 
 import click
 from dotenv import dotenv_values
@@ -23,7 +24,7 @@ from flask_admin import Admin, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
 try:
     from flask_admin.theme import Bootstrap4Theme
-except ImportError:  # Flask-Admin < 2.0
+except ImportError:
     Bootstrap4Theme = None
 from flask_login import (
     LoginManager,
@@ -2201,6 +2202,24 @@ def add_customer():
         source_options=CUSTOMER_SOURCE_OPTIONS,
     )
 
+#help funcion for getting order number
+def generate_order_number():
+    """Generate a unique order number"""
+    year = datetime.now().year
+    last_order = Order.query.order_by(Order.id.desc()).first()
+    
+    if last_order and last_order.order_number:
+
+        try:
+            last_num = int(last_order.order_number.split('-')[-1])
+            new_num = last_num + 1
+        except:
+            new_num = 1
+    else:
+        new_num = 1
+    
+    return f"ORD-{year}-{new_num:04d}"
+
 @app.route("/add-order", methods=["GET", "POST"])
 @require_permission(PERMISSION_ORDERS_EDIT)
 def add_order():
@@ -2224,7 +2243,9 @@ def add_order():
             "status": (request.form.get("status") or "").strip(),
             "placed_at": (request.form.get("placed_at") or "").strip(),
         }
-        line_items = list(
+        
+        # Get line items from form
+        line_items_raw = list(
             zip(
                 request.form.getlist("product_id"),
                 request.form.getlist("quantity"),
@@ -2237,7 +2258,7 @@ def add_order():
                 "quantity": (quantity or "").strip(),
                 "unit_price": (unit_price or "").strip(),
             }
-            for product_id, quantity, unit_price in line_items
+            for product_id, quantity, unit_price in line_items_raw
         ] or line_items
 
         errors = []
@@ -2311,7 +2332,7 @@ def add_order():
                 unit_price = Decimal(item["unit_price"])
                 if unit_price < 0:
                     raise ValueError
-            except (InvalidOperation, ValueError):
+            except Exception:
                 errors.append(f"Line item {index} price must be a valid non-negative amount.")
 
             if product is not None and quantity is not None and unit_price is not None:
@@ -2354,21 +2375,21 @@ def add_order():
                 )
             )
             db.session.commit()
-            flash("Order created.", "success")
+            flash(f"Order {order.order_number} created successfully!", "success")
             return redirect(url_for("orders", search=order.order_number))
-
+        
+        # If there are errors, show them
         for error in errors:
             flash(error, "error")
-
-    return render_template(
-        "addOrder.html",
-        form_data=form_data,
-        customers=customers,
-        products=products,
-        line_items=line_items,
-        order_platform_options=ORDER_PLATFORM_OPTIONS,
-        order_status_options=ORDER_STATUS_OPTIONS,
-    )
+    
+    # GET request or form with errors - show the form
+    return render_template("addOrder.html", 
+                         customers=customers, 
+                         products=products,
+                         form_data=form_data,
+                         line_items=line_items,
+                         order_platform_options=ORDER_PLATFORM_OPTIONS,
+                         order_status_options=ORDER_STATUS_OPTIONS)
 
 @app.route("/add-inventory", methods=["GET", "POST"])
 @require_permission(PERMISSION_INVENTORY_EDIT)

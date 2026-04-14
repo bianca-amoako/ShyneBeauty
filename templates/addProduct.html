@@ -4,7 +4,9 @@
 {% block title %}Add Product{% endblock %}
 {% block page_title %}Add Product{% endblock %}
 {% block page_description %}
-  <p>Create a finished-product record so it can be used in order entry and catalog operations.</p>
+
+<p>Create a finished-product record so it can be used in order entry and catalog operations.</p>
+
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
@@ -12,54 +14,35 @@
 {% endblock %}
 
 {% block content %}
-  {% if created_product %}
-    <section class="sb-panel">
-      <h2>Product created</h2>
-      <p class="sb-section-note">{{ created_product.name }} ({{ created_product.sku }}) is now available for future order entry.</p>
-    </section>
-  {% endif %}
-
-  <section class="sb-panel">
-    <h2>Product details</h2>
-    <form class="sb-form-grid" method="post" action="{{ url_for('add_product') }}" novalidate>
-      {{ csrf_input() }}
-      <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="product-name" name="name" type="text" placeholder=" " value="{{ form_data.name }}" required>
-          <label for="product-name">Product Name</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="product-sku" name="sku" type="text" placeholder=" " value="{{ form_data.sku }}" required>
-          <label for="product-sku">SKU</label>
-        </div>
-        <div class="sb-field sb-field-select">
-          <label class="sb-label-above" for="product-status">Status</label>
-          <div class="sb-select-wrap">
-            <select class="sb-select" id="product-status" name="status">
-              <option value="Active" {% if form_data.status == "Active" %}selected{% endif %}>Active</option>
-              <option value="Inactive" {% if form_data.status == "Inactive" %}selected{% endif %}>Inactive</option>
-            </select>
-            <span class="sb-select-arrow" aria-hidden="true"></span>
+  <div class="sb-panel">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
           </div>
-        </div>
-      </div>
-      <div class="sb-form-row">
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="product-price" name="price" type="text" inputmode="decimal" placeholder=" " value="{{ form_data.price }}" required>
-          <label for="product-price">Price</label>
-        </div>
-        <div class="sb-field sb-field-float">
-          <input class="sb-input" id="product-reorder-threshold" name="reorder_threshold" type="number" min="0" placeholder=" " value="{{ form_data.reorder_threshold }}" required>
-          <label for="product-reorder-threshold">Reorder Threshold</label>
-        </div>
-      </div>
-      <div class="sb-field sb-field-float sb-field-textarea">
-        <textarea class="sb-textarea" id="product-description" name="description" placeholder=" ">{{ form_data.description }}</textarea>
-        <label for="product-description">Description</label>
-      </div>
-      <div class="sb-form-actions">
-        <button class="sb-button" type="submit">Create product</button>
-      </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Product Form -->
+    <form method="post" action="{{ url_for('add_product') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label><b>Product Name *</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter product name" required>
+
+      <label><b>SKU *</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="sku" placeholder="Enter SKU (Stock Keeping Unit)" required>
+
+      <label><b>Price *</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="price" step="0.01" placeholder="0.00" required>
+
+      <label><b>Reorder Threshold</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" placeholder="Minimum stock before reordering" value="10">
+
+      <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Product</button>
+      <a href="{{ url_for('index') }}" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
     </form>
-  </section>
+  </div>
 {% endblock %}
