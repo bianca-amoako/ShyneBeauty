@@ -2,7 +2,7 @@ import json
 import os
 import secrets
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -1604,15 +1604,132 @@ def inventory():
 def add_new():
     return render_template("addNew.html")
 
-@app.route("/add-customer")
+@app.route("/add-customer", methods=["GET", "POST"])
 @login_required
 def add_customer():
+    if request.method == "POST":
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        street_address = request.form.get('street_address')
+        city = request.form.get('city')
+        state = request.form.get('state')
+        postal_code = request.form.get('postal_code')
+        country = request.form.get('country') or "USA"
+        source = request.form.get('source')
+        
+        if not first_name or not last_name or not email:
+            flash("First name, last name, and email are required.", "error")
+            return render_template("add_customer.html")
+        
+        existing_customer = Customer.query.filter_by(email=email).first()
+        if existing_customer:
+            flash(f"Customer with email {email} already exists.", "error")
+            return render_template("add_customer.html")
+
+        new_customer = Customer(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            phone=phone,
+            street_address=street_address,
+            city=city,
+            state=state,
+            postal_code=postal_code,
+            country=country,
+            source=source
+        )
+        try:
+            db.session.add(new_customer)
+            db.session.commit()
+            flash(f"Customer {first_name} {last_name} added successfully!", "success")
+            return redirect(url_for('customers'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error adding customer: {str(e)}", "error")
+            return render_template("add_customer.html")
+
     return render_template("addCustomer.html")
 
-@app.route("/add-order")
+@app.route("/add-order", methods=["GET", "POST"])
 @login_required
 def add_order():
-    return render_template("addOrder.html")
+        if request.method == "POST":
+            customer_id = request.form.get('customer_id')
+            platform = request.form.get('platform')
+            status = request.form.get('status')
+            placed_at_str = request.form.get('placed_at')
+        
+
+            product_ids = request.form.getlist('product_id[]')
+            quantities = request.form.getlist('quantity[]')
+        
+            if not order_number or not customer_id or not platform:
+                flash("Order number, customer, and platform are required.", "error")
+                return redirect(url_for('add_order'))
+        
+            if not product_ids or not product_ids[0]:
+                flash("At least one product is required.", "error")
+                return redirect(url_for('add_order'))
+        
+            placed_at = datetime.strptime(placed_at_str, '%Y-%m-%d') if placed_at_str else utc_now()
+            
+            total_amount = Decimal('0.00')
+            order_items_data = []
+            
+            for i, product_id in enumerate(product_ids):
+                if product_id:
+                    quantity = int(quantities[i]) if i < len(quantities) else 1
+                    product = Product.query.get(product_id)
+                    if product:
+                        item_total = product.price * quantity
+                        total_amount += item_total
+                        order_items_data.append({
+                            'product_id': product_id,
+                            'quantity': quantity,
+                            'unit_price': product.price
+                        })
+            
+            new_order = Order(
+                customer_id=customer_id,
+                platform=platform,
+                status=status,
+                total_amount=total_amount,
+                placed_at=placed_at,
+                updated_at=utc_now()
+            )
+            
+            try:
+                db.session.add(new_order)
+                db.session.flush()
+                
+                for item in order_items_data:
+                    order_item = OrderItem(
+                        order_id=new_order.id,
+                        product_id=item['product_id'],
+                        quantity=item['quantity'],
+                        unit_price=item['unit_price']
+                    )
+                    db.session.add(order_item)
+                
+                db.session.commit()
+                flash(f"Order {order_number} created successfully!", "success")
+                return redirect(url_for('orders'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error creating order: {str(e)}", "error")
+                return redirect(url_for('add_order'))
+        
+        customers = Customer.query.order_by(Customer.first_name).all()
+        products = Product.query.filter_by(active=True).order_by(Product.name).all()
+        today = date.today().isoformat()
+    
+        return render_template("addOrder.html", 
+                             customers=customers, 
+                             products=products,
+                             today=today)
 
 @app.route("/add-inventory")
 @login_required

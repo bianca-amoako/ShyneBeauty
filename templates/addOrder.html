@@ -22,6 +22,12 @@
     .sb-subtle { color: #7a746d; }
     .sb-button { background-color: #bfe3df; color: #4c4a46; border: none; }
     .sb-button-warm { background-color: #e8d5bd; color: #4c4a46; border: none; }
+    .sb-button-danger { background-color: #f0e7dc; color: #d32f2f; border: none; }
+    .error-message { color: #d32f2f; background-color: #ffebee; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+    .success-message { color: #388e3c; background-color: #e8f5e9; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+    .product-row { background-color: #f9f7f4; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+    .remove-product { cursor: pointer; color: #d32f2f; margin-left: 10px; }
+    .add-product-btn { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -35,7 +41,7 @@
   <div class="w3-container"><h5 class="sb-heading">Dashboard</h5></div>
   <div class="w3-bar-block">
     <a href="/" class="w3-bar-item w3-button w3-padding">Home Dashboard</a>
-    <a href="/add-new" class="w3-bar-item w3-button w3-padding sb-active">Add New</a>
+    <a href="/add-order" class="w3-bar-item w3-button w3-padding sb-active">Add New</a>
   </div>
 </nav>
 
@@ -48,40 +54,82 @@
   </header>
 
   <div class="w3-container sb-panel w3-padding w3-margin">
-    <label><b>Order ID</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Enter order ID">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-    <label><b>Customer Name</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Enter customer name">
+    <form method="post" action="{{ url_for('add_order') }}" id="orderForm">
+      <!-- Order Information -->
+      <label><b>Customer *</b></label>
+      <select class="w3-select w3-border w3-margin-bottom" name="customer_id" required>
+        <option value="">Select Customer</option>
+        {% for customer in customers %}
+          <option value="{{ customer.id }}">{{ customer.first_name }} {{ customer.last_name }} - {{ customer.email }}</option>
+        {% endfor %}
+      </select>
 
-    <label><b>Order Source</b></label>
-    <select class="w3-select w3-border w3-margin-bottom">
-      <option>Fiverr</option>
-      <option>Square</option>
-      <option>Google Sheets</option>
-      <option>Manual Entry</option>
-    </select>
+      <label><b>Platform/Source *</b></label>
+      <select class="w3-select w3-border w3-margin-bottom" name="platform" required>
+        <option value="">Select Source</option>
+        <option value="Fiverr">Fiverr</option>
+        <option value="Square">Square</option>
+        <option value="Google Sheets">Google Sheets</option>
+      </select>
 
-    <label><b>Products</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Enter products">
+      <label><b>Status</b></label>
+      <select class="w3-select w3-border w3-margin-bottom" name="status">
+        <option value="New">New</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Waiting for Ingredients">Waiting for Ingredients</option>
+        <option value="Packed">Packed</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Completed">Completed</option>
+      </select>
 
-    <label><b>Status</b></label>
-    <select class="w3-select w3-border w3-margin-bottom">
-      <option>New</option>
-      <option>In Progress</option>
-      <option>Packed</option>
-      <option>Shipped</option>
-      <option>Completed</option>
-    </select>
+      <label><b>Order Date</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="date" name="placed_at" value="{{ today }}">
 
-    <label><b>Order Date</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="date">
+      <!-- Products Section -->
+      <label><b>Products</b></label>
+      <div id="products-container">
+        <div class="product-row" id="product-1">
+          <div class="w3-row-padding">
+            <div class="w3-half">
+              <label>Product</label>
+              <select class="w3-select w3-border" name="product_id[]" required>
+                <option value="">Select Product</option>
+                {% for product in products %}
+                  <option value="{{ product.id }}">{{ product.name }} (SKU: {{ product.sku }}) - ${{ "%.2f"|format(product.price) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="w3-third">
+              <label>Quantity</label>
+              <input class="w3-input w3-border" type="number" name="quantity[]" value="1" min="1" required>
+            </div>
+            <div class="w3-sixth">
+              <label>&nbsp;</label>
+              <button type="button" class="w3-button sb-button-danger" onclick="removeProduct(1)" style="display:none">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <label><b>Total</b></label>
-    <input class="w3-input w3-border w3-margin-bottom" type="text" placeholder="Enter total">
+      <button type="button" class="w3-button sb-button add-product-btn" onclick="addProduct()">
+        <i class="fa fa-plus"></i> Add Another Product
+      </button>
 
-    <button class="w3-button sb-button">Save Order</button>
-    <button class="w3-button sb-button-warm">Cancel</button>
+      <div class="w3-margin-top">
+        <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Order</button>
+        <a href="/orders" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -90,6 +138,45 @@
   var overlayBg = document.getElementById("myOverlay");
   function w3_open() { mySidebar.style.display = "block"; overlayBg.style.display = "block"; }
   function w3_close() { mySidebar.style.display = "none"; overlayBg.style.display = "none"; }
+
+  let productCount = 1;
+
+  function addProduct() {
+    productCount++;
+    const container = document.getElementById('products-container');
+    const newProduct = document.createElement('div');
+    newProduct.className = 'product-row';
+    newProduct.id = `product-${productCount}`;
+    newProduct.innerHTML = `
+      <div class="w3-row-padding">
+        <div class="w3-half">
+          <label>Product</label>
+          <select class="w3-select w3-border" name="product_id[]" required>
+            <option value="">Select Product</option>
+            {% for product in products %}
+              <option value="{{ product.id }}">{{ product.name }} (SKU: {{ product.sku }}) - ${{ "%.2f"|format(product.price) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="w3-third">
+          <label>Quantity</label>
+          <input class="w3-input w3-border" type="number" name="quantity[]" value="1" min="1" required>
+        </div>
+        <div class="w3-sixth">
+          <label>&nbsp;</label>
+          <button type="button" class="w3-button sb-button-danger" onclick="removeProduct(${productCount})">Remove</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(newProduct);
+  }
+
+  function removeProduct(id) {
+    const productDiv = document.getElementById(`product-${id}`);
+    if (productDiv) {
+      productDiv.remove();
+    }
+  }
 </script>
 
 </body>
