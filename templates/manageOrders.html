@@ -6,7 +6,7 @@
   <p>Track orders from Fiverr, Square, Google Sheets, and manual internal entry.</p>
 {% endblock %}
 {% block page_actions %}
-  <a class="sb-button" href="{{ url_for('add_order') }}">Review add-order layout</a>
+  <a class="sb-button" href="{{ url_for('add_order') }}">Add order</a>
   <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
 {% endblock %}
 
@@ -23,9 +23,9 @@
           <div class="sb-select-wrap">
             <select class="sb-select" id="orders-source" name="source">
               <option value="">All Sources</option>
-              <option value="Fiverr" {% if selected_source == 'Fiverr' %}selected{% endif %}>Fiverr</option>
-              <option value="Square" {% if selected_source == 'Square' %}selected{% endif %}>Square</option>
-              <option value="Google Sheets" {% if selected_source == 'Google Sheets' %}selected{% endif %}>Google Sheets</option>
+              {% for platform in order_platform_options %}
+                <option value="{{ platform }}" {% if selected_source == platform %}selected{% endif %}>{{ platform }}</option>
+              {% endfor %}
             </select>
             <span class="sb-select-arrow" aria-hidden="true"></span>
           </div>
@@ -35,12 +35,9 @@
           <div class="sb-select-wrap">
             <select class="sb-select" id="orders-status" name="status">
               <option value="">All Statuses</option>
-              <option value="New" {% if selected_status == 'New' %}selected{% endif %}>New</option>
-              <option value="In Progress" {% if selected_status == 'In Progress' %}selected{% endif %}>In Progress</option>
-              <option value="Waiting for Ingredients" {% if selected_status == 'Waiting for Ingredients' %}selected{% endif %}>Waiting for Ingredients</option>
-              <option value="Packed" {% if selected_status == 'Packed' %}selected{% endif %}>Packed</option>
-              <option value="Shipped" {% if selected_status == 'Shipped' %}selected{% endif %}>Shipped</option>
-              <option value="Completed" {% if selected_status == 'Completed' %}selected{% endif %}>Completed</option>
+              {% for status in order_status_options %}
+                <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
             </select>
             <span class="sb-select-arrow" aria-hidden="true"></span>
           </div>

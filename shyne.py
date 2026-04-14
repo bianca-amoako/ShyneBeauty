@@ -3,6 +3,7 @@ import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -35,7 +36,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -212,6 +213,8 @@ ADMIN_ACCESS_EVENT_STATUS_CHANGED = "account.status_changed"
 ADMIN_ACCESS_EVENT_ACCESS_DENIED = "access.denied"
 CUSTOMER_SOURCE_OPTIONS = ("Fiverr", "Square", "Manual Entry")
 GOOGLE_SHEETS_ORDER_SOURCE = "Google Sheets"
+ORDER_PLATFORM_OPTIONS = ("Fiverr", "Square", GOOGLE_SHEETS_ORDER_SOURCE, "Direct")
+ORDER_STATUS_OPTIONS = ("Placed", "Ready", "Completed")
 SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
@@ -1556,6 +1559,8 @@ def orders():
         search_query=search_query,
         selected_source=source,
         selected_status=status,
+        order_platform_options=ORDER_PLATFORM_OPTIONS,
+        order_status_options=ORDER_STATUS_OPTIONS,
     )
 
 
@@ -1638,10 +1643,174 @@ def add_new():
 def add_customer():
     return render_template("addCustomer.html")
 
-@app.route("/add-order")
-@login_required
+@app.route("/add-order", methods=["GET", "POST"])
+@require_permission(PERMISSION_ORDERS_EDIT)
 def add_order():
-    return render_template("addOrder.html")
+    customers = Customer.query.order_by(Customer.last_name, Customer.first_name).all()
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
+
+    form_data = {
+        "order_number": "",
+        "customer_id": "",
+        "platform": "Direct",
+        "status": "Placed",
+        "placed_at": datetime.now(timezone.utc).date().isoformat(),
+    }
+    line_items = [{"product_id": "", "quantity": "1", "unit_price": ""}]
+
+    if request.method == "POST":
+        form_data = {
+            "order_number": (request.form.get("order_number") or "").strip(),
+            "customer_id": (request.form.get("customer_id") or "").strip(),
+            "platform": (request.form.get("platform") or "").strip(),
+            "status": (request.form.get("status") or "").strip(),
+            "placed_at": (request.form.get("placed_at") or "").strip(),
+        }
+        line_items = list(
+            zip(
+                request.form.getlist("product_id"),
+                request.form.getlist("quantity"),
+                request.form.getlist("unit_price"),
+            )
+        )
+        line_items = [
+            {
+                "product_id": (product_id or "").strip(),
+                "quantity": (quantity or "").strip(),
+                "unit_price": (unit_price or "").strip(),
+            }
+            for product_id, quantity, unit_price in line_items
+        ] or line_items
+
+        errors = []
+        customer = None
+        placed_at = None
+        parsed_line_items = []
+        total_amount = Decimal("0.00")
+
+        if not form_data["order_number"]:
+            errors.append("Order number is required.")
+        elif Order.query.filter(
+            func.lower(Order.order_number) == form_data["order_number"].lower()
+        ).first():
+            errors.append("An order with that number already exists.")
+
+        if not form_data["customer_id"]:
+            errors.append("Customer is required.")
+        else:
+            try:
+                customer = db.session.get(Customer, int(form_data["customer_id"]))
+            except ValueError:
+                customer = None
+            if customer is None:
+                errors.append("Select a valid customer.")
+
+        if form_data["platform"] not in ORDER_PLATFORM_OPTIONS:
+            errors.append("Order source must be a supported platform.")
+
+        if form_data["status"] not in ORDER_STATUS_OPTIONS:
+            errors.append("Status must be Placed, Ready, or Completed.")
+
+        if not form_data["placed_at"]:
+            errors.append("Order date is required.")
+        else:
+            try:
+                placed_at = datetime.strptime(
+                    form_data["placed_at"], "%Y-%m-%d"
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                errors.append("Order date must be a valid date.")
+
+        active_line_items = [
+            item
+            for item in line_items
+            if item["product_id"] or item["quantity"] or item["unit_price"]
+        ]
+        if not active_line_items:
+            errors.append("Add at least one line item.")
+
+        product_lookup = {product.id: product for product in products}
+        for index, item in enumerate(active_line_items, start=1):
+            product = None
+            quantity = None
+            unit_price = None
+
+            try:
+                product = product_lookup.get(int(item["product_id"]))
+            except ValueError:
+                product = None
+            if product is None:
+                errors.append(f"Line item {index} must use a valid product.")
+
+            try:
+                quantity = int(item["quantity"])
+                if quantity <= 0:
+                    raise ValueError
+            except ValueError:
+                errors.append(f"Line item {index} quantity must be a positive whole number.")
+
+            try:
+                unit_price = Decimal(item["unit_price"])
+                if unit_price < 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                errors.append(f"Line item {index} price must be a valid non-negative amount.")
+
+            if product is not None and quantity is not None and unit_price is not None:
+                parsed_line_items.append(
+                    {
+                        "product": product,
+                        "quantity": quantity,
+                        "unit_price": unit_price,
+                    }
+                )
+                total_amount += unit_price * quantity
+
+        if not errors:
+            order = Order(
+                customer=customer,
+                order_number=form_data["order_number"],
+                platform=form_data["platform"],
+                total_amount=total_amount,
+                status=form_data["status"],
+                placed_at=placed_at,
+            )
+            db.session.add(order)
+            db.session.flush()
+
+            for item in parsed_line_items:
+                db.session.add(
+                    OrderItem(
+                        order=order,
+                        product=item["product"],
+                        quantity=item["quantity"],
+                        unit_price=item["unit_price"],
+                    )
+                )
+
+            db.session.add(
+                OrderStatusEvent(
+                    order=order,
+                    event_status=form_data["status"],
+                    message="Initial status recorded on order creation.",
+                )
+            )
+            db.session.commit()
+            flash("Order created.", "success")
+            return redirect(url_for("orders", search=order.order_number))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template(
+        "addOrder.html",
+        form_data=form_data,
+        customers=customers,
+        products=products,
+        line_items=line_items,
+        order_platform_options=ORDER_PLATFORM_OPTIONS,
+        order_status_options=ORDER_STATUS_OPTIONS,
+    )
 
 @app.route("/add-inventory")
 @login_required
