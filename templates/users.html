@@ -22,7 +22,7 @@
       white-space: normal;
     }
 
-    .sb-users-table tbody tr[data-selected="true"] {
+    .sb-users-table tbody tr[aria-selected="true"] {
       background: #fbf4ea;
     }
 
@@ -202,7 +202,7 @@
           </thead>
           <tbody>
             {% for user in users_list %}
-              <tr {% if selected_user and selected_user.id == user.id %}data-selected="true"{% endif %}>
+              <tr {% if selected_user and selected_user.id == user.id %}aria-selected="true"{% endif %}>
                 <td data-label="Name">{{ user.full_name or "No name set" }}</td>
                 <td data-label="Email">{{ user.email }}</td>
                 <td data-label="Role">{{ user.get_role() }}</td>

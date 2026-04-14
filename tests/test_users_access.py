@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from shyne import (
     ACCOUNT_STATUS_ACTIVE,
     ACCOUNT_STATUS_INVITED,
+    ACCOUNT_STATUS_SUSPENDED,
     PERMISSION_ADMIN_CONSOLE_ACCESS,
     ROLE_DEV_ADMIN,
     ROLE_STAFF_OPERATOR,
@@ -29,6 +32,15 @@ def test_dev_admin_is_hidden_from_users_table(client, admin_user, dev_admin_user
 
     assert response.status_code == 200
     assert b"devadmin@shynebeauty.com" not in response.data
+
+
+def test_users_page_marks_selected_row_for_assistive_tech(client, admin_user, login):
+    login(client)
+
+    response = client.get("/users")
+
+    assert response.status_code == 200
+    assert b'aria-selected="true"' in response.data
 
 
 def test_create_user_with_manual_temporary_password(
@@ -228,6 +240,132 @@ def test_legacy_pending_invite_can_still_be_activated_with_temporary_password(
         assert activated_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
         assert activated_user.requires_password_change() is True
         assert activated_user.check_password("LegacyTempPassw0rd!") is True
+
+
+def test_superadmin_can_resend_pending_invite(client, admin_user, admin_factory, app, login):
+    with app.app_context():
+        invited_user = admin_factory(
+            email="pending-resend@shynebeauty.com",
+            full_name="Pending Resend",
+            password=None,
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_INVITED,
+        )
+        invited_user.invited_at = datetime.now(timezone.utc) - timedelta(days=3)
+        db.session.commit()
+        invited_user_id = invited_user.id
+        original_invited_at = invited_user.invited_at
+
+    login(client)
+
+    response = client.post(f"/users/{invited_user_id}/resend-invite")
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, invited_user_id)
+        assert refreshed_user.get_account_status() == ACCOUNT_STATUS_INVITED
+        assert refreshed_user.invited_at > original_invited_at
+        assert refreshed_user.invited_by_user_id == admin_user
+
+
+def test_superadmin_can_cancel_pending_invite(client, admin_user, admin_factory, app, login):
+    with app.app_context():
+        invited_user = admin_factory(
+            email="pending-cancel@shynebeauty.com",
+            full_name="Pending Cancel",
+            password=None,
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_INVITED,
+        )
+        invited_user_id = invited_user.id
+
+    login(client)
+
+    response = client.post(f"/users/{invited_user_id}/cancel-invite")
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        assert db.session.get(AdminUser, invited_user_id) is None
+
+
+def test_superadmin_can_reactivate_suspended_user(client, admin_user, admin_factory, app, login):
+    with app.app_context():
+        suspended_user = admin_factory(
+            email="reactivate@shynebeauty.com",
+            full_name="Reactivate User",
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_SUSPENDED,
+            failed_login_count=4,
+            locked_until=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+        suspended_user_id = suspended_user.id
+
+    login(client)
+
+    response = client.post(f"/users/{suspended_user_id}/reactivate")
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, suspended_user_id)
+        assert refreshed_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+        assert refreshed_user.failed_login_count == 0
+        assert refreshed_user.locked_until is None
+
+
+def test_activate_user_rejects_non_invited_account(client, admin_user, staff_user, app, login):
+    login(client)
+
+    response = client.post(
+        f"/users/{staff_user}/activate",
+        data={
+            "password": "LegacyTempPassw0rd!",
+            "password_confirmation": "LegacyTempPassw0rd!",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Only pending invites can be activated." in response.data
+
+    with app.app_context():
+        active_user = db.session.get(AdminUser, staff_user)
+        assert active_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+        assert active_user.check_password("LegacyTempPassw0rd!") is False
+
+
+def test_temporary_password_rejects_non_active_account(
+    client, admin_user, admin_factory, app, login
+):
+    with app.app_context():
+        suspended_user = admin_factory(
+            email="suspended-reset@shynebeauty.com",
+            full_name="Suspended Reset",
+            role=ROLE_STAFF_OPERATOR,
+            account_status=ACCOUNT_STATUS_SUSPENDED,
+        )
+        suspended_user_id = suspended_user.id
+
+    login(client)
+
+    response = client.post(
+        f"/users/{suspended_user_id}/temporary-password",
+        data={
+            "password": "NewTempPassw0rd!",
+            "password_confirmation": "NewTempPassw0rd!",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Only active accounts can receive a temporary password." in response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, suspended_user_id)
+        assert refreshed_user.get_account_status() == ACCOUNT_STATUS_SUSPENDED
+        assert refreshed_user.check_password("NewTempPassw0rd!") is False
 
 
 def test_users_page_can_filter_pending_invites(

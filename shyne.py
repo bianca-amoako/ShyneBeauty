@@ -37,8 +37,9 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
+from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlalchemy import func, inspect, or_, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 FAILED_LOGIN_THRESHOLD = 5
@@ -355,6 +356,32 @@ def parse_non_negative_decimal(raw_value, *, field_label):
     return value
 
 
+def read_line_items_form_data(form):
+    product_ids = form.getlist("product_id")
+    quantities = form.getlist("quantity")
+    unit_prices = form.getlist("unit_price")
+    lengths_match = len({len(product_ids), len(quantities), len(unit_prices)}) == 1
+    max_length = max(len(product_ids), len(quantities), len(unit_prices), 1)
+
+    line_items = []
+    for index in range(max_length):
+        line_items.append(
+            {
+                "product_id": (
+                    product_ids[index].strip() if index < len(product_ids) else ""
+                ),
+                "quantity": (
+                    quantities[index].strip() if index < len(quantities) else ""
+                ),
+                "unit_price": (
+                    unit_prices[index].strip() if index < len(unit_prices) else ""
+                ),
+            }
+        )
+
+    return line_items, lengths_match
+
+
 def is_safe_next_target(target):
     if not target:
         return False
@@ -442,6 +469,22 @@ def current_request_next_target():
     if request.query_string:
         return f"{request.path}?{request.query_string.decode('utf-8')}"
     return request.path
+
+
+def revoke_authenticated_session(*, redirect_to_login=True):
+    session.clear()
+    logout_user()
+    flash(
+        "Your session is no longer active. Sign in again or contact a superadmin.",
+        "error",
+    )
+    if not redirect_to_login:
+        return None
+
+    safe_next = get_safe_next_target(current_request_next_target())
+    if safe_next:
+        return redirect(url_for("login", next=safe_next))
+    return redirect(url_for("login"))
 
 
 def generate_temporary_password(length=16):
@@ -1741,7 +1784,7 @@ register_admin_views()
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        return db.session.get(AdminUser, int(user_id))
+        return db.session.get(AdminUser, int(user_id), populate_existing=True)
     except (TypeError, ValueError):
         return None
 
@@ -1757,6 +1800,26 @@ def ensure_request_auth_schema_compatibility():
         return None
     ensure_runtime_auth_schema_compatibility()
     return None
+
+
+@app.before_request
+def invalidate_revoked_authenticated_session():
+    if request.endpoint == "static" or not current_user.is_authenticated:
+        return None
+
+    try:
+        db.session.refresh(current_user._get_current_object())
+    except (InvalidRequestError, ObjectDeletedError):
+        return revoke_authenticated_session(redirect_to_login=request.endpoint != "login")
+
+    comparison_time = utc_now()
+    if (
+        current_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
+        and not current_user.is_locked(comparison_time)
+    ):
+        return None
+
+    return revoke_authenticated_session(redirect_to_login=request.endpoint != "login")
 
 
 @app.before_request
@@ -2243,29 +2306,16 @@ def add_order():
             "status": (request.form.get("status") or "").strip(),
             "placed_at": (request.form.get("placed_at") or "").strip(),
         }
-        
-        # Get line items from form
-        line_items_raw = list(
-            zip(
-                request.form.getlist("product_id"),
-                request.form.getlist("quantity"),
-                request.form.getlist("unit_price"),
-            )
-        )
-        line_items = [
-            {
-                "product_id": (product_id or "").strip(),
-                "quantity": (quantity or "").strip(),
-                "unit_price": (unit_price or "").strip(),
-            }
-            for product_id, quantity, unit_price in line_items_raw
-        ] or line_items
+        line_items, line_item_lengths_match = read_line_items_form_data(request.form)
 
         errors = []
         customer = None
         placed_at = None
         parsed_line_items = []
         total_amount = Decimal("0.00")
+
+        if not line_item_lengths_match:
+            errors.append("Each line item must include a product, quantity, and price.")
 
         if not form_data["order_number"]:
             errors.append("Order number is required.")
