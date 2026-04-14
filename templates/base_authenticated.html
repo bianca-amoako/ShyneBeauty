@@ -11,6 +11,7 @@
   {% block head_extra %}{% endblock %}
 </head>
 <body>
+  {% from "_form_helpers.html" import csrf_input %}
   <a class="sb-skip-link" href="#main-content">Skip to main content</a>
   <div class="sb-mobile-overlay" id="sb-mobile-overlay" hidden></div>
   <div class="sb-shell">
@@ -36,6 +37,7 @@
           <span>{{ current_admin_role_label }}</span>
         </div>
         <form method="post" action="{{ url_for('logout') }}">
+          {{ csrf_input() }}
           <button class="sb-button-secondary" type="submit">Log out</button>
         </form>
       </div>

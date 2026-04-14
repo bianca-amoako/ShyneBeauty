@@ -26,6 +26,19 @@ def test_login_route_sets_security_headers(client):
     assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
 
 
+def test_login_rejects_missing_csrf_token(csrf_client, admin_user):
+    response = csrf_client.post(
+        "/login",
+        data={
+            "email": "admin@shynebeauty.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
+
+    assert response.status_code == 400
+    assert b"CSRF" in response.data
+
+
 def test_login_route_rejects_missing_credentials_with_feedback(client):
     response = client.post("/login", data={"email": "", "password": ""})
 
@@ -205,6 +218,17 @@ def test_logout_clears_authentication(client, admin_user, login):
         if header.startswith("remember_token=")
     )
     assert "Expires=Thu, 01 Jan 1970" in remember_cookie
+
+
+def test_logout_rejects_missing_csrf_token(csrf_client, admin_user, login):
+    login(csrf_client)
+
+    response = csrf_client.post("/logout", follow_redirects=False)
+
+    assert response.status_code == 302
+
+    protected_response = csrf_client.get("/")
+    assert protected_response.status_code == 200
 
 
 def test_lockout_triggers_after_repeated_failed_attempts(client, admin_user, app, login):
@@ -438,6 +462,40 @@ def test_forced_password_change_clears_requirement_and_restores_access(
         refreshed_user = db.session.get(AdminUser, user.id)
         assert refreshed_user.requires_password_change() is False
         assert refreshed_user.check_password("BrandNewPassw0rd!") is True
+
+
+def test_forced_password_change_rejects_missing_csrf_token(
+    csrf_client, admin_factory, app, login
+):
+    user = admin_factory(
+        email="temp-csrf@shynebeauty.com",
+        full_name="Temp Csrf",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(
+        csrf_client,
+        email="temp-csrf@shynebeauty.com",
+        password="TempPassw0rd!",
+    )
+
+    response = csrf_client.post(
+        "/change-password?next=/orders",
+        data={
+            "password": "BrandNewPassw0rd!",
+            "password_confirmation": "BrandNewPassw0rd!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert b"CSRF" in response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.requires_password_change() is True
 
 
 @pytest.mark.parametrize(

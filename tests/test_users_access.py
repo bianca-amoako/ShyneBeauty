@@ -93,6 +93,31 @@ def test_create_user_with_generated_temporary_password_shows_password_once(
         assert created_user.requires_password_change() is True
 
 
+def test_users_invite_rejects_missing_csrf_token(
+    csrf_client, admin_user, app, login
+):
+    login(csrf_client)
+
+    response = csrf_client.post(
+        "/users/invite",
+        data={
+            "full_name": "Taylor Temp",
+            "email": "taylor@shynebeauty.com",
+            "role": ROLE_STAFF_OPERATOR,
+            "password_mode": "manual",
+            "password": "TempPassw0rd!",
+            "password_confirmation": "TempPassw0rd!",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        created_user = AdminUser.query.filter_by(email="taylor@shynebeauty.com").first()
+        assert created_user is None
+
+
 def test_last_active_superadmin_cannot_be_demoted(client, admin_user, app, login):
     login(client)
 
