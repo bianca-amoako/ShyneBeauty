@@ -21,7 +21,9 @@ from shyne import (
     PASSWORD_HASH_METHOD,
     Product,
     ProductBatch,
+    ROLE_INVENTORY_PRODUCTION,
     ROLE_DEV_ADMIN,
+    ROLE_STAFF_OPERATOR,
     ROLE_SUPERADMIN,
     Shipment,
     db,
@@ -90,33 +92,7 @@ def test_login_route_renders_expected_content(client):
     assert b"Forgot password?" in response.data
     assert b"trusted internal admin workflow" in response.data
     assert b"Local development shortcut" not in response.data
-
-
-def test_login_route_shows_dev_test_admin_hint_when_enabled(app, client):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
-
-    response = client.get("/login")
-
-    assert response.status_code == 200
-    assert b"Local development setup" in response.data
-    assert b"seed-dev-admin" in response.data
-    assert b"sign in with <code>admin</code> / <code>admin</code>" in response.data
-
-
-def test_login_route_shows_dev_test_admin_credentials_after_seeding(app, client):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
-    runner = app.test_cli_runner()
-
-    result = runner.invoke(args=["seed-dev-admin"])
-
-    assert result.exit_code == 0
-
-    response = client.get("/login")
-
-    assert response.status_code == 200
-    assert b"Local development shortcut" in response.data
-    assert b"email field" in response.data
-    assert b"admin</code> as the password" in response.data
+    assert b"seed-dev-admin" not in response.data
 
 
 def test_index_route_links_to_orders_page(client, admin_user, login):
@@ -171,7 +147,7 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
     result = runner.invoke(args=["init-db"])
 
     assert result.exit_code == 0
-    assert "Database initialized." in result.output
+    assert "Database initialized and demo data reset." in result.output
 
     primary_inspector = inspect(db.engine)
     auth_inspector = inspect(db.engines["auth"])
@@ -207,6 +183,40 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
         "permission_overrides_json",
     }
 
+    with app.app_context():
+        seeded_users = {
+            user.email: user for user in AdminUser.query.order_by(AdminUser.email).all()
+        }
+        assert set(seeded_users) == {
+            "devops@shynebeauty.com",
+            "maya.brooks@shynebeauty.com",
+            "noah.kim@shynebeauty.com",
+            "olivia.mercer@shynebeauty.com",
+        }
+        assert seeded_users["olivia.mercer@shynebeauty.com"].get_role() == ROLE_SUPERADMIN
+        assert seeded_users["maya.brooks@shynebeauty.com"].get_role() == ROLE_STAFF_OPERATOR
+        assert (
+            seeded_users["noah.kim@shynebeauty.com"].get_role()
+            == ROLE_INVENTORY_PRODUCTION
+        )
+        assert seeded_users["devops@shynebeauty.com"].get_role() == ROLE_DEV_ADMIN
+        assert (
+            seeded_users["olivia.mercer@shynebeauty.com"].check_password(
+                "ShyneDemoSuper1!"
+            )
+            is True
+        )
+        assert Customer.query.count() == 4
+        assert Product.query.count() == 4
+        assert Ingredient.query.count() == 5
+        assert Batch.query.count() == 2
+        assert ProductBatch.query.count() == 3
+        assert Order.query.count() == 4
+        assert OrderItem.query.count() == 6
+        assert OrderStatusEvent.query.count() == 4
+        assert Shipment.query.count() == 2
+        assert AdminAccessEvent.query.count() == 4
+
 
 def test_init_db_cli_command_is_idempotent(app):
     runner = app.test_cli_runner()
@@ -216,8 +226,42 @@ def test_init_db_cli_command_is_idempotent(app):
 
     assert first_result.exit_code == 0
     assert second_result.exit_code == 0
-    assert "Database initialized." in first_result.output
-    assert "Database initialized." in second_result.output
+    assert "Database initialized and demo data reset." in first_result.output
+    assert "Database initialized and demo data reset." in second_result.output
+
+    with app.app_context():
+        assert AdminUser.query.count() == 4
+        assert Customer.query.count() == 4
+        assert Order.query.count() == 4
+
+
+def test_init_db_cli_command_replaces_existing_auth_and_business_data(app):
+    with app.app_context():
+        legacy_user = AdminUser(
+            email="legacy@shynebeauty.com",
+            full_name="Legacy User",
+        )
+        legacy_user.set_password("legacy-password")
+        legacy_user.set_role(ROLE_SUPERADMIN, now=datetime.now(timezone.utc))
+        legacy_user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=datetime.now(timezone.utc))
+        legacy_customer = Customer(
+            first_name="Legacy",
+            last_name="Customer",
+            email="legacy.customer@example.com",
+        )
+        db.session.add_all([legacy_user, legacy_customer])
+        db.session.commit()
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["init-db"])
+
+    assert result.exit_code == 0
+
+    with app.app_context():
+        assert AdminUser.query.filter_by(email="legacy@shynebeauty.com").count() == 0
+        assert Customer.query.filter_by(email="legacy.customer@example.com").count() == 0
+        assert AdminUser.query.count() == 4
+        assert Customer.query.count() == 4
 
 
 def test_init_db_cli_command_adds_customer_source_column_to_existing_table(app):
@@ -279,74 +323,21 @@ def test_create_admin_cli_command_creates_hashed_password(app):
         assert "admin_users" in set(inspect(db.engines["auth"]).get_table_names())
 
 
-def test_create_admin_cli_command_rejects_reserved_dev_admin_identifier(app):
+def test_create_admin_cli_command_allows_admin_identifier_now(app):
     runner = app.test_cli_runner()
 
     result = runner.invoke(
         args=["create-admin", "--email", "admin"],
-        input="admin\nadmin\n",
+        input="AdminPassw0rd!\nAdminPassw0rd!\n",
     )
 
-    assert result.exit_code != 0
-    assert "reserved for the dev-only seed-dev-admin command" in result.output
-
-
-def test_seed_dev_admin_cli_command_requires_enable_flag(app):
-    runner = app.test_cli_runner()
-
-    result = runner.invoke(args=["seed-dev-admin"])
-
-    assert result.exit_code != 0
-    assert "ENABLE_DEV_TEST_ADMIN=true" in result.output
-
-
-def test_seed_dev_admin_cli_command_requires_debug_or_testing_mode(app):
-    app.config.update(
-        ENABLE_DEV_TEST_ADMIN=True,
-        TESTING=False,
-        DEBUG=False,
-    )
-    runner = app.test_cli_runner()
-
-    result = runner.invoke(args=["seed-dev-admin"])
-
-    assert result.exit_code != 0
-    assert "debug or testing mode" in result.output
-
-
-def test_seed_dev_admin_cli_command_upserts_dev_admin(app):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
-    runner = app.test_cli_runner()
-
-    first_result = runner.invoke(args=["seed-dev-admin"])
-
-    assert first_result.exit_code == 0
-    assert "Dev test admin created: admin" in first_result.output
+    assert result.exit_code == 0
+    assert "Admin user created: admin" in result.output
 
     with app.app_context():
         user = AdminUser.query.filter_by(email="admin").one()
-        user.full_name = None
-        user.is_active = False
-        user.failed_login_count = 5
-        user.locked_until = datetime.now(timezone.utc)
-        db.session.commit()
-
-    second_result = runner.invoke(args=["seed-dev-admin"])
-
-    assert second_result.exit_code == 0
-    assert "Dev test admin updated: admin" in second_result.output
-
-    with app.app_context():
-        user = AdminUser.query.filter_by(email="admin").one()
-        assert user.full_name == "Dev Admin"
-        assert user.is_active is True
-        assert user.get_role() == ROLE_DEV_ADMIN
-        assert user.failed_login_count == 0
-        assert user.locked_until is None
-        assert user.password_hash != "admin"
-        assert user.password_hash.startswith(f"{PASSWORD_HASH_METHOD}$")
-        assert user.check_password("admin") is True
-        assert AdminUser.query.filter_by(email="admin").count() == 1
+        assert user.get_role() == ROLE_SUPERADMIN
+        assert user.check_password("AdminPassw0rd!") is True
 
 
 def test_create_dev_admin_cli_command_creates_hidden_dev_admin(app):

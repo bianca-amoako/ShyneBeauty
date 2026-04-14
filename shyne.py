@@ -231,6 +231,36 @@ NO_STORE_ENDPOINTS = {
     "inventory",
     "users",
 }
+DEMO_USER_ACCOUNTS = (
+    {
+        "email": "olivia.mercer@shynebeauty.com",
+        "full_name": "Olivia Mercer",
+        "role": ROLE_SUPERADMIN,
+        "password": "ShyneDemoSuper1!",
+        "last_login_at": datetime(2026, 4, 14, 8, 45, tzinfo=timezone.utc),
+    },
+    {
+        "email": "maya.brooks@shynebeauty.com",
+        "full_name": "Maya Brooks",
+        "role": ROLE_STAFF_OPERATOR,
+        "password": "ShyneDemoStaff1!",
+        "last_login_at": datetime(2026, 4, 13, 16, 20, tzinfo=timezone.utc),
+    },
+    {
+        "email": "noah.kim@shynebeauty.com",
+        "full_name": "Noah Kim",
+        "role": ROLE_INVENTORY_PRODUCTION,
+        "password": "ShyneDemoInventory1!",
+        "last_login_at": None,
+    },
+    {
+        "email": "devops@shynebeauty.com",
+        "full_name": "Shyne DevOps",
+        "role": ROLE_DEV_ADMIN,
+        "password": "ShyneDemoDev1!",
+        "last_login_at": datetime(2026, 4, 14, 7, 55, tzinfo=timezone.utc),
+    },
+)
 
 
 def require_env(name):
@@ -355,6 +385,28 @@ def get_safe_next_target(target):
     return ""
 
 
+def get_safe_referrer_target(target):
+    if not target:
+        return ""
+
+    candidate = target.strip()
+    if "\\" in candidate:
+        return ""
+
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"}:
+        return ""
+    if parsed.netloc != request.host:
+        return ""
+    if not parsed.path:
+        return ""
+
+    local_target = parsed.path
+    if parsed.query:
+        local_target = f"{local_target}?{parsed.query}"
+    return get_safe_next_target(local_target)
+
+
 def redirect_to_safe_next(target, *, fallback_endpoint="index"):
     safe_target = get_safe_next_target(target)
     if safe_target:
@@ -371,8 +423,6 @@ def handle_csrf_error(error):
             "login.html",
             form_data={"email": "", "remember_me": False},
             next_url=get_safe_next_target(request.args.get("next")),
-            show_dev_test_admin_hint=dev_test_admin_enabled(),
-            dev_test_admin_seeded=dev_test_admin_seeded(),
         ), 400
 
     if request.endpoint == "change_password":
@@ -381,7 +431,10 @@ def handle_csrf_error(error):
             next_url=get_safe_next_target(request.args.get("next")),
         ), 400
 
-    return redirect(request.referrer or url_for("index"))
+    safe_referrer = get_safe_referrer_target(request.referrer)
+    if safe_referrer:
+        return redirect(safe_referrer)
+    return redirect(url_for("index"))
 
 
 def current_request_next_target():
@@ -422,42 +475,6 @@ def deserialize_state(value, default=None):
 
 def unique_strings(values):
     return sorted({value for value in values if value})
-
-
-def dev_test_admin_enabled(flask_app=None):
-    target_app = flask_app or app
-    return bool(target_app.config.get("ENABLE_DEV_TEST_ADMIN")) and (
-        target_app.testing or target_app.debug
-    )
-
-
-def is_dev_test_admin_email(email):
-    return normalize_email(email) == DEV_TEST_ADMIN_EMAIL
-
-
-def is_dev_test_admin_account(admin_user):
-    return admin_user is not None and is_dev_test_admin_email(admin_user.email)
-
-
-def dev_test_admin_seeded():
-    if not dev_test_admin_enabled():
-        return False
-    return (
-        db.session.query(AdminUser.id)
-        .filter_by(email=DEV_TEST_ADMIN_EMAIL)
-        .first()
-        is not None
-    )
-
-
-def require_dev_test_admin_mode(flask_app=None):
-    if dev_test_admin_enabled(flask_app):
-        return
-
-    raise click.ClickException(
-        "seed-dev-admin is only available when ENABLE_DEV_TEST_ADMIN=true "
-        "and the app is running in debug or testing mode."
-    )
 
 
 def ensure_customer_source_column():
@@ -543,6 +560,405 @@ def ensure_runtime_auth_schema_compatibility():
     # and audit table before request-time queries hit the ORM.
     AdminAccessEvent.__table__.create(bind=auth_engine, checkfirst=True)
     ensure_admin_user_access_columns()
+
+
+def reset_auth_demo_data():
+    db.session.query(AdminAccessEvent).delete()
+    db.session.query(AdminUser).delete()
+
+    for account in DEMO_USER_ACCOUNTS:
+        comparison_time = utc_now()
+        admin_user = AdminUser(
+            email=account["email"],
+            full_name=account["full_name"],
+            last_login_at=account["last_login_at"],
+        )
+        admin_user.set_role(account["role"], now=comparison_time)
+        admin_user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=comparison_time)
+        admin_user.set_password(account["password"])
+        admin_user.must_change_password = False
+        admin_user.reset_login_state()
+        admin_user.sync_legacy_state()
+        db.session.add(admin_user)
+        db.session.flush()
+        log_admin_access_event(
+            event_type=ADMIN_ACCESS_EVENT_ACCOUNT_CREATED,
+            outcome=ADMIN_ACCESS_EVENT_OUTCOME_SUCCESS,
+            target=admin_user,
+            after_state=serialize_admin_user_snapshot(admin_user, now=comparison_time),
+            note="Seeded by init-db demo reset.",
+        )
+
+
+def reset_business_demo_data():
+    db.session.query(Shipment).delete()
+    db.session.query(OrderStatusEvent).delete()
+    db.session.query(OrderItem).delete()
+    db.session.query(ProductBatch).delete()
+    db.session.query(BatchIngredient).delete()
+    db.session.query(Order).delete()
+    db.session.query(Batch).delete()
+    db.session.query(Product).delete()
+    db.session.query(Ingredient).delete()
+    db.session.query(Customer).delete()
+
+    customers = {
+        "imani": Customer(
+            first_name="Imani",
+            last_name="Reed",
+            email="imani.reed@example.com",
+            phone="404-555-0146",
+            street_address="412 Peachtree St NE",
+            city="Atlanta",
+            state="GA",
+            postal_code="30308",
+            country="USA",
+            source="Fiverr",
+            created_at=datetime(2026, 4, 5, 13, 15, tzinfo=timezone.utc),
+        ),
+        "sophia": Customer(
+            first_name="Sophia",
+            last_name="Patel",
+            email="sophia.patel@example.com",
+            phone="312-555-0198",
+            street_address="81 W Wacker Dr",
+            city="Chicago",
+            state="IL",
+            postal_code="60601",
+            country="USA",
+            source="Square",
+            created_at=datetime(2026, 4, 7, 10, 0, tzinfo=timezone.utc),
+        ),
+        "leah": Customer(
+            first_name="Leah",
+            last_name="Nguyen",
+            email="leah.nguyen@example.com",
+            phone="713-555-0114",
+            street_address="208 Main St",
+            city="Houston",
+            state="TX",
+            postal_code="77002",
+            country="USA",
+            source="Manual Entry",
+            created_at=datetime(2026, 4, 9, 15, 30, tzinfo=timezone.utc),
+        ),
+        "zoe": Customer(
+            first_name="Zoe",
+            last_name="Turner",
+            email="zoe.turner@example.com",
+            phone="615-555-0109",
+            street_address="900 Woodland St",
+            city="Nashville",
+            state="TN",
+            postal_code="37206",
+            country="USA",
+            source="Manual Entry",
+            created_at=datetime(2026, 4, 11, 9, 5, tzinfo=timezone.utc),
+        ),
+    }
+    db.session.add_all(customers.values())
+
+    products = {
+        "serum": Product(
+            sku="SER-101",
+            name="Radiance Serum",
+            description="Daily brightening serum with niacinamide and rosehip oil.",
+            price=Decimal("28.00"),
+            active=True,
+            reorder_threshold=8,
+            created_at=datetime(2026, 4, 1, 9, 0, tzinfo=timezone.utc),
+        ),
+        "butter": Product(
+            sku="BB-205",
+            name="Velvet Body Butter",
+            description="Rich shea butter blend for overnight moisture repair.",
+            price=Decimal("22.50"),
+            active=True,
+            reorder_threshold=6,
+            created_at=datetime(2026, 4, 2, 11, 0, tzinfo=timezone.utc),
+        ),
+        "oil": Product(
+            sku="LO-330",
+            name="Glossed Lip Oil",
+            description="Conditioning lip oil with vitamin E and jojoba.",
+            price=Decimal("14.00"),
+            active=True,
+            reorder_threshold=12,
+            created_at=datetime(2026, 4, 3, 14, 0, tzinfo=timezone.utc),
+        ),
+        "sampler": Product(
+            sku="KIT-404",
+            name="Glow Sample Set",
+            description="Inactive sample bundle kept for historical demo data.",
+            price=Decimal("36.00"),
+            active=False,
+            reorder_threshold=0,
+            created_at=datetime(2026, 4, 4, 16, 0, tzinfo=timezone.utc),
+        ),
+    }
+    db.session.add_all(products.values())
+
+    ingredients = {
+        "niacinamide": Ingredient(
+            name="Niacinamide",
+            stock_quantity=Decimal("18.000"),
+            unit="g",
+            supplier_name="Actives Lab",
+            supplier_contact="purchasing@activeslab.example",
+            reorder_threshold=Decimal("8.000"),
+            created_at=datetime(2026, 4, 1, 8, 0, tzinfo=timezone.utc),
+        ),
+        "shea": Ingredient(
+            name="Shea Butter",
+            stock_quantity=Decimal("4.500"),
+            unit="kg",
+            supplier_name="Pure Butter Co.",
+            supplier_contact="orders@purebutter.example",
+            reorder_threshold=Decimal("5.000"),
+            created_at=datetime(2026, 4, 1, 8, 15, tzinfo=timezone.utc),
+        ),
+        "rosehip": Ingredient(
+            name="Rosehip Oil",
+            stock_quantity=Decimal("0.000"),
+            unit="L",
+            supplier_name="Botanical Source",
+            supplier_contact="sales@botanicals.example",
+            reorder_threshold=Decimal("2.000"),
+            created_at=datetime(2026, 4, 1, 8, 30, tzinfo=timezone.utc),
+        ),
+        "vitamin_e": Ingredient(
+            name="Vitamin E",
+            stock_quantity=Decimal("12.000"),
+            unit="g",
+            supplier_name="Actives Lab",
+            supplier_contact="purchasing@activeslab.example",
+            reorder_threshold=Decimal("3.000"),
+            created_at=datetime(2026, 4, 1, 8, 45, tzinfo=timezone.utc),
+        ),
+        "bottles": Ingredient(
+            name="Amber Dropper Bottles",
+            stock_quantity=Decimal("15.000"),
+            unit="units",
+            supplier_name="PackRight",
+            supplier_contact="support@packright.example",
+            reorder_threshold=Decimal("15.000"),
+            created_at=datetime(2026, 4, 1, 9, 0, tzinfo=timezone.utc),
+        ),
+    }
+    db.session.add_all(ingredients.values())
+
+    batches = {
+        "serum_batch": Batch(
+            batch_code="B-2026-0412-A",
+            status="Open",
+            started_at=datetime(2026, 4, 12, 8, 0, tzinfo=timezone.utc),
+            notes="Current serum production run for marketplace replenishment.",
+        ),
+        "butter_batch": Batch(
+            batch_code="B-2026-0408-B",
+            status="Closed",
+            started_at=datetime(2026, 4, 8, 7, 30, tzinfo=timezone.utc),
+            ended_at=datetime(2026, 4, 8, 14, 45, tzinfo=timezone.utc),
+            notes="Completed body butter batch used to fulfill Square orders.",
+        ),
+    }
+    db.session.add_all(batches.values())
+    db.session.flush()
+
+    db.session.add_all(
+        [
+            BatchIngredient(
+                batch=batches["serum_batch"],
+                ingredient=ingredients["niacinamide"],
+                quantity_used=Decimal("2.250"),
+                unit="g",
+            ),
+            BatchIngredient(
+                batch=batches["serum_batch"],
+                ingredient=ingredients["rosehip"],
+                quantity_used=Decimal("1.100"),
+                unit="L",
+            ),
+            BatchIngredient(
+                batch=batches["butter_batch"],
+                ingredient=ingredients["shea"],
+                quantity_used=Decimal("3.500"),
+                unit="kg",
+            ),
+            BatchIngredient(
+                batch=batches["butter_batch"],
+                ingredient=ingredients["vitamin_e"],
+                quantity_used=Decimal("0.600"),
+                unit="g",
+            ),
+        ]
+    )
+
+    product_batches = {
+        "serum_lot": ProductBatch(
+            batch=batches["serum_batch"],
+            product=products["serum"],
+            lot_number="LOT-SER-0412",
+            units_produced=48,
+            units_available=36,
+            expiry_date=datetime(2027, 4, 12, tzinfo=timezone.utc).date(),
+            created_at=datetime(2026, 4, 12, 12, 15, tzinfo=timezone.utc),
+        ),
+        "butter_lot": ProductBatch(
+            batch=batches["butter_batch"],
+            product=products["butter"],
+            lot_number="LOT-BB-0408",
+            units_produced=32,
+            units_available=18,
+            expiry_date=datetime(2027, 1, 8, tzinfo=timezone.utc).date(),
+            created_at=datetime(2026, 4, 8, 15, 0, tzinfo=timezone.utc),
+        ),
+        "oil_lot": ProductBatch(
+            batch=batches["serum_batch"],
+            product=products["oil"],
+            lot_number="LOT-LO-0412",
+            units_produced=60,
+            units_available=52,
+            expiry_date=datetime(2027, 4, 12, tzinfo=timezone.utc).date(),
+            created_at=datetime(2026, 4, 12, 13, 0, tzinfo=timezone.utc),
+        ),
+    }
+    db.session.add_all(product_batches.values())
+    db.session.flush()
+
+    orders = {
+        "fiverr_ready": Order(
+            customer=customers["imani"],
+            order_number="SB-2048",
+            platform="Fiverr",
+            total_amount=Decimal("42.00"),
+            status="Ready",
+            placed_at=datetime(2026, 4, 14, 10, 30, tzinfo=timezone.utc),
+        ),
+        "square_completed": Order(
+            customer=customers["sophia"],
+            order_number="SB-2047",
+            platform="Square",
+            total_amount=Decimal("22.50"),
+            status="Completed",
+            placed_at=datetime(2026, 4, 13, 14, 20, tzinfo=timezone.utc),
+        ),
+        "sheets_placed": Order(
+            customer=customers["leah"],
+            order_number="SB-2046",
+            platform=GOOGLE_SHEETS_ORDER_SOURCE,
+            total_amount=Decimal("28.00"),
+            status="Placed",
+            placed_at=datetime(2026, 4, 12, 11, 10, tzinfo=timezone.utc),
+        ),
+        "direct_placed": Order(
+            customer=customers["imani"],
+            order_number="SB-2045",
+            platform="Direct",
+            total_amount=Decimal("50.50"),
+            status="Placed",
+            placed_at=datetime(2026, 4, 11, 17, 5, tzinfo=timezone.utc),
+        ),
+    }
+    db.session.add_all(orders.values())
+    db.session.flush()
+
+    db.session.add_all(
+        [
+            OrderItem(
+                order=orders["fiverr_ready"],
+                product=products["serum"],
+                product_batch=product_batches["serum_lot"],
+                quantity=1,
+                unit_price=Decimal("28.00"),
+            ),
+            OrderItem(
+                order=orders["fiverr_ready"],
+                product=products["oil"],
+                product_batch=product_batches["oil_lot"],
+                quantity=1,
+                unit_price=Decimal("14.00"),
+            ),
+            OrderItem(
+                order=orders["square_completed"],
+                product=products["butter"],
+                product_batch=product_batches["butter_lot"],
+                quantity=1,
+                unit_price=Decimal("22.50"),
+            ),
+            OrderItem(
+                order=orders["sheets_placed"],
+                product=products["serum"],
+                quantity=1,
+                unit_price=Decimal("28.00"),
+            ),
+            OrderItem(
+                order=orders["direct_placed"],
+                product=products["serum"],
+                product_batch=product_batches["serum_lot"],
+                quantity=1,
+                unit_price=Decimal("28.00"),
+            ),
+            OrderItem(
+                order=orders["direct_placed"],
+                product=products["butter"],
+                product_batch=product_batches["butter_lot"],
+                quantity=1,
+                unit_price=Decimal("22.50"),
+            ),
+        ]
+    )
+
+    db.session.add_all(
+        [
+            OrderStatusEvent(
+                order=orders["fiverr_ready"],
+                event_status="Ready",
+                message="Packed and queued for USPS pickup.",
+                created_at=datetime(2026, 4, 14, 11, 0, tzinfo=timezone.utc),
+            ),
+            OrderStatusEvent(
+                order=orders["square_completed"],
+                event_status="Completed",
+                message="Delivered to customer and closed out.",
+                created_at=datetime(2026, 4, 13, 18, 45, tzinfo=timezone.utc),
+            ),
+            OrderStatusEvent(
+                order=orders["sheets_placed"],
+                event_status="Placed",
+                message="Imported from Google Sheets intake queue.",
+                created_at=datetime(2026, 4, 12, 11, 15, tzinfo=timezone.utc),
+            ),
+            OrderStatusEvent(
+                order=orders["direct_placed"],
+                event_status="Placed",
+                message="Manual direct order awaiting fulfillment review.",
+                created_at=datetime(2026, 4, 11, 17, 10, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+
+    db.session.add_all(
+        [
+            Shipment(
+                order=orders["fiverr_ready"],
+                carrier="USPS",
+                tracking_number="9400111206210582048001",
+                tracking_url="https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206210582048001",
+                shipped_at=datetime(2026, 4, 14, 12, 15, tzinfo=timezone.utc),
+                created_at=datetime(2026, 4, 14, 12, 15, tzinfo=timezone.utc),
+            ),
+            Shipment(
+                order=orders["square_completed"],
+                carrier="UPS",
+                tracking_number="1Z999AA10123456784",
+                tracking_url="https://www.ups.com/track?tracknum=1Z999AA10123456784",
+                shipped_at=datetime(2026, 4, 13, 15, 0, tzinfo=timezone.utc),
+                delivered_at=datetime(2026, 4, 14, 9, 10, tzinfo=timezone.utc),
+                created_at=datetime(2026, 4, 13, 15, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
 
 
 class AdminUser(UserMixin, db.Model):
@@ -1488,9 +1904,7 @@ def login():
             admin_user = AdminUser.query.filter_by(email=email).first()
             now = utc_now()
 
-            if admin_user and is_dev_test_admin_account(admin_user) and not dev_test_admin_enabled():
-                flash("Invalid email or password.", "error")
-            elif admin_user and admin_user.is_locked(now):
+            if admin_user and admin_user.is_locked(now):
                 flash("Invalid email or password.", "error")
             elif (
                 admin_user
@@ -1522,8 +1936,6 @@ def login():
         "login.html",
         form_data=form_data,
         next_url=next_url,
-        show_dev_test_admin_hint=dev_test_admin_enabled(),
-        dev_test_admin_seeded=dev_test_admin_seeded(),
     )
 
 
@@ -2531,7 +2943,10 @@ def init_db_command():
     db.create_all(bind_key="__all__")
     ensure_customer_source_column()
     ensure_admin_user_access_columns()
-    print("Database initialized.")
+    reset_auth_demo_data()
+    reset_business_demo_data()
+    db.session.commit()
+    print("Database initialized and demo data reset.")
 
 
 def choose_default_business_role():
@@ -2563,10 +2978,6 @@ def create_admin_command(email, full_name, role, update):
     normalized_email = normalize_email(email)
     if not normalized_email:
         raise click.ClickException("A valid email address is required.")
-    if is_dev_test_admin_email(normalized_email):
-        raise click.ClickException(
-            "The 'admin' identifier is reserved for the dev-only seed-dev-admin command."
-        )
 
     password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
     if not password:
@@ -2702,33 +3113,6 @@ def backfill_admin_access_command(first_superadmin_email, dev_admin_emails):
 
     db.session.commit()
     click.echo("Admin access backfill completed.")
-
-
-@app.cli.command("seed-dev-admin")
-def seed_dev_admin_command():
-    require_dev_test_admin_mode()
-
-    db.create_all(bind_key=AUTH_BIND_KEY)
-    ensure_admin_user_access_columns()
-    admin_user = AdminUser.query.filter_by(email=DEV_TEST_ADMIN_EMAIL).first()
-
-    if admin_user is None:
-        admin_user = AdminUser(email=DEV_TEST_ADMIN_EMAIL)
-        db.session.add(admin_user)
-        action = "created"
-    else:
-        action = "updated"
-
-    comparison_time = utc_now()
-    admin_user.full_name = DEV_TEST_ADMIN_FULL_NAME
-    admin_user.set_role(ROLE_DEV_ADMIN, now=comparison_time)
-    admin_user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=comparison_time)
-    admin_user.reset_login_state()
-    admin_user.set_password(DEV_TEST_ADMIN_PASSWORD)
-    admin_user.sync_legacy_state()
-    db.session.commit()
-
-    click.echo(f"Dev test admin {action}: {DEV_TEST_ADMIN_EMAIL}")
 
 
 if __name__ == "__main__":

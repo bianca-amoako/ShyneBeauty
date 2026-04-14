@@ -115,7 +115,7 @@ def test_invalid_credentials_show_generic_error(client, admin_user, email, passw
     assert b"Invalid email or password." in response.data
 
 
-def test_default_config_rejects_dev_test_admin_credentials(client):
+def test_unknown_credentials_are_rejected(client):
     response = client.post("/login", data={"email": "admin", "password": "admin"})
 
     assert response.status_code == 200
@@ -231,6 +231,68 @@ def test_logout_rejects_missing_csrf_token(csrf_client, admin_user, login):
     assert protected_response.status_code == 200
 
 
+def test_logout_missing_csrf_redirects_to_same_origin_referrer(
+    csrf_client, admin_user, login
+):
+    login(csrf_client)
+
+    response = csrf_client.post(
+        "/logout",
+        headers={"Referer": "http://localhost/orders?status=open"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders?status=open")
+
+    protected_response = csrf_client.get("/")
+    assert protected_response.status_code == 200
+
+
+def test_logout_missing_csrf_rejects_external_referrer(
+    csrf_client, admin_user, login
+):
+    login(csrf_client)
+
+    response = csrf_client.post(
+        "/logout",
+        headers={"Referer": "https://evil.example/phish"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+    protected_response = csrf_client.get("/")
+    assert protected_response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "referer",
+    [
+        "//evil.example/phish",
+        "http://localhost\\orders?status=open",
+        "https:///evil.example/phish",
+    ],
+)
+def test_logout_missing_csrf_rejects_malformed_referrers(
+    csrf_client, admin_user, login, referer
+):
+    login(csrf_client)
+
+    response = csrf_client.post(
+        "/logout",
+        headers={"Referer": referer},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+    protected_response = csrf_client.get("/")
+    assert protected_response.status_code == 200
+
+
 def test_lockout_triggers_after_repeated_failed_attempts(client, admin_user, app, login):
     for _ in range(5):
         response = client.post(
@@ -279,78 +341,108 @@ def test_expired_lockout_allows_login_again(client, admin_user, app, login):
         assert row.locked_until is None
 
 
-def test_seeded_dev_test_admin_can_log_in_and_access_protected_routes(client, app):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+def test_seeded_superadmin_can_log_in_after_init_db(client, app):
     runner = app.test_cli_runner()
-    result = runner.invoke(args=["seed-dev-admin"])
+    result = runner.invoke(args=["init-db"])
 
     assert result.exit_code == 0
 
     response = client.post(
         "/login",
-        data={"email": "admin", "password": "admin", "next": "/orders"},
+        data={
+            "email": "olivia.mercer@shynebeauty.com",
+            "password": "ShyneDemoSuper1!",
+            "next": "/users",
+        },
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/orders")
+    assert response.headers["Location"].endswith("/users")
 
     with app.app_context():
-        user = AdminUser.query.filter_by(email="admin").one()
+        user = AdminUser.query.filter_by(email="olivia.mercer@shynebeauty.com").one()
         user_id = user.id
         assert user.last_login_at is not None
 
     with client.session_transaction() as session_data:
         assert session_data.get("_user_id") == str(user_id)
 
-    protected_response = client.get("/orders")
+    protected_response = client.get("/users")
     assert protected_response.status_code == 200
-    assert b"Manage Orders" in protected_response.data
+    assert b"Users & Access" in protected_response.data
 
 
-def test_seeded_dev_test_admin_is_rejected_when_dev_mode_is_disabled(client, app):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+def test_seeded_dev_admin_can_access_admin_console_after_init_db(client, app):
     runner = app.test_cli_runner()
-    result = runner.invoke(args=["seed-dev-admin"])
+    result = runner.invoke(args=["init-db"])
 
     assert result.exit_code == 0
 
-    app.config["ENABLE_DEV_TEST_ADMIN"] = False
-
     response = client.post(
         "/login",
-        data={"email": "admin", "password": "admin"},
+        data={
+            "email": "devops@shynebeauty.com",
+            "password": "ShyneDemoDev1!",
+            "next": "/admin/",
+        },
     )
 
-    assert response.status_code == 200
-    assert b"Invalid email or password." in response.data
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/admin/")
 
-    with client.session_transaction() as session_data:
-        assert "_user_id" not in session_data
+    admin_response = client.get("/admin/")
+    assert admin_response.status_code == 200
+    assert b"ShyneBeauty Admin" in admin_response.data
 
 
-def test_seeded_dev_test_admin_still_locks_after_repeated_failed_attempts(client, app):
-    app.config["ENABLE_DEV_TEST_ADMIN"] = True
+def test_business_role_seeded_by_init_db_cannot_access_admin_console(client, app):
     runner = app.test_cli_runner()
-    result = runner.invoke(args=["seed-dev-admin"])
+    result = runner.invoke(args=["init-db"])
+
+    assert result.exit_code == 0
+
+    login_response = client.post(
+        "/login",
+        data={
+            "email": "maya.brooks@shynebeauty.com",
+            "password": "ShyneDemoStaff1!",
+        },
+    )
+    assert login_response.status_code == 302
+
+    admin_response = client.get("/admin/")
+    assert admin_response.status_code == 403
+    assert b"Admin console access denied" in admin_response.data
+
+
+def test_seeded_demo_user_still_locks_after_repeated_failed_attempts(client, app):
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["init-db"])
 
     assert result.exit_code == 0
 
     for _ in range(5):
         response = client.post(
             "/login",
-            data={"email": "admin", "password": "wrong-password"},
+            data={
+                "email": "devops@shynebeauty.com",
+                "password": "wrong-password",
+            },
         )
         assert response.status_code == 200
         assert b"Invalid email or password." in response.data
 
     with app.app_context():
-        user = AdminUser.query.filter_by(email="admin").one()
+        user = AdminUser.query.filter_by(email="devops@shynebeauty.com").one()
         assert user.failed_login_count == 5
         assert user.locked_until is not None
 
     locked_response = client.post(
         "/login",
-        data={"email": "admin", "password": "admin"},
+        data={
+            "email": "devops@shynebeauty.com",
+            "password": "ShyneDemoDev1!",
+        },
     )
 
     assert locked_response.status_code == 200
