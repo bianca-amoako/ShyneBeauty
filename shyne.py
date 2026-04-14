@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
+from decimal import Decimal
 
 import click
 from dotenv import dotenv_values
@@ -22,7 +23,7 @@ from flask_admin import Admin, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
 try:
     from flask_admin.theme import Bootstrap4Theme
-except ImportError:  # Flask-Admin < 2.0
+except ImportError:
     Bootstrap4Theme = None
 from flask_login import (
     LoginManager,
@@ -1681,6 +1682,24 @@ def add_customer():
 
     return render_template("addCustomer.html")
 
+#help funcion for getting order number
+def generate_order_number():
+    """Generate a unique order number"""
+    year = datetime.now().year
+    last_order = Order.query.order_by(Order.id.desc()).first()
+    
+    if last_order and last_order.order_number:
+
+        try:
+            last_num = int(last_order.order_number.split('-')[-1])
+            new_num = last_num + 1
+        except:
+            new_num = 1
+    else:
+        new_num = 1
+    
+    return f"ORD-{year}-{new_num:04d}"
+
 @app.route("/add-order", methods=["GET", "POST"])
 @login_required
 def add_order():
@@ -1694,8 +1713,8 @@ def add_order():
             product_ids = request.form.getlist('product_id[]')
             quantities = request.form.getlist('quantity[]')
         
-            if not order_number or not customer_id or not platform:
-                flash("Order number, customer, and platform are required.", "error")
+            if not customer_id or not platform:
+                flash("Customer, and platform are required.", "error")
                 return redirect(url_for('add_order'))
         
             if not product_ids or not product_ids[0]:
@@ -1721,6 +1740,7 @@ def add_order():
                         })
             
             new_order = Order(
+                order_number=generate_order_number(),
                 customer_id=customer_id,
                 platform=platform,
                 status=status,
@@ -1743,7 +1763,7 @@ def add_order():
                     db.session.add(order_item)
                 
                 db.session.commit()
-                flash(f"Order {order_number} created successfully!", "success")
+                flash(f"Order {new_order.id} created successfully!", "success")
                 return redirect(url_for('orders'))
                 
             except Exception as e:
@@ -1760,14 +1780,108 @@ def add_order():
                              products=products,
                              today=today)
 
-@app.route("/add-inventory")
+@app.route("/add-inventory", methods=["GET", "POST"])
 @login_required
 def add_inventory():
+    if request.method == "POST":
+
+        name = request.form.get('name')
+        stock_quantity = request.form.get('stock_quantity')
+        unit = request.form.get('unit')
+        supplier_name = request.form.get('supplier_name')
+        supplier_contact = request.form.get('supplier_contact')
+        reorder_threshold = request.form.get('reorder_threshold', 0)
+        
+        if not name:
+            flash("Item name is required.", "error")
+            return redirect(url_for('add_inventory'))
+        
+        if stock_quantity is None or stock_quantity == '':
+            flash("Stock quantity is required.", "error")
+            return redirect(url_for('add_inventory'))
+        
+        if not unit:
+            flash("Unit is required.", "error")
+            return redirect(url_for('add_inventory'))
+        
+
+        existing_item = Ingredient.query.filter_by(name=name).first()
+        if existing_item:
+            flash(f"An item with the name '{name}' already exists.", "error")
+            return redirect(url_for('add_inventory'))
+        
+
+        try:
+            new_item = Ingredient(
+                name=name,
+                stock_quantity=float(stock_quantity),
+                unit=unit,
+                supplier_name=supplier_name if supplier_name else None,
+                supplier_contact=supplier_contact if supplier_contact else None,
+                reorder_threshold=float(reorder_threshold) if reorder_threshold else 0
+            )
+            
+            db.session.add(new_item)
+            db.session.commit()
+            flash(f"Inventory item '{name}' added successfully!", "success")
+            return redirect(url_for('inventory'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error adding inventory item: {str(e)}", "error")
+            return redirect(url_for('add_inventory'))
+    
     return render_template("addInventoryItem.html")
 
-@app.route("/add-product")
+@app.route("/add-product", methods=["GET", "POST"])
 @login_required
 def add_product():
+    if request.method == "POST":
+        name = request.form.get('name')
+        sku = request.form.get('sku')
+        description = request.form.get('description')
+        price = request.form.get('price')
+        reorder_threshold = request.form.get('reorder_threshold', 0)
+        active = request.form.get('active', 'on') == 'on'
+
+        if not name:
+            flash("Product name is required.", "error")
+            return redirect(url_for('add_product'))
+        
+        if not sku:
+            flash("SKU is required.", "error")
+            return redirect(url_for('add_product'))
+        
+        if not price:
+            flash("Price is required.", "error")
+            return redirect(url_for('add_product'))
+        
+        existing_product = Product.query.filter_by(sku=sku).first()
+        if existing_product:
+            flash(f"Product with SKU {sku} already exists.", "error")
+            return redirect(url_for('add_product'))
+        
+        try:
+            new_product = Product(
+                name=name,
+                sku=sku,
+                description=description,
+                price=Decimal(str(price)),
+                reorder_threshold=int(reorder_threshold) if reorder_threshold else 0,
+                active=True
+            )
+            
+            db.session.add(new_product)
+            db.session.commit()
+            flash(f"Product {name} (SKU: {sku}) added successfully!", "success")
+            return redirect(url_for('inventory'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error adding product: {str(e)}", "error")
+            return redirect(url_for('add_product'))
+    
+
     return render_template("addProduct.html")
     
 @app.route("/users")

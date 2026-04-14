@@ -26,6 +26,8 @@
     {% endwith %}
 
     <form method="post" action="{{ url_for('add_order') }}" id="orderForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
       <!-- Order Information -->
       <label><b>Customer *</b></label>
       <select class="w3-select w3-border w3-margin-bottom" name="customer_id" required>
