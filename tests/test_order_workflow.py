@@ -215,3 +215,47 @@ def test_add_order_validates_line_item_values(client, admin_user, app, login):
     assert response.status_code == 200
     assert b"Line item 1 quantity must be a positive whole number." in response.data
     assert b"Line item 1 price must be a valid non-negative amount." in response.data
+
+
+def test_add_order_rejects_misaligned_line_item_payloads(client, admin_user, app, login):
+    with app.app_context():
+        customer = Customer(
+            first_name="Taylor",
+            last_name="Customer",
+            email="taylor@shynebeauty.com",
+            country="USA",
+        )
+        product = Product(
+            name="Glow Balm",
+            sku="GB-001",
+            price=Decimal("24.50"),
+            active=True,
+            reorder_threshold=5,
+        )
+        db.session.add_all([customer, product])
+        db.session.commit()
+        customer_id = customer.id
+        product_id = product.id
+
+    login(client)
+
+    response = client.post(
+        "/add-order",
+        data={
+            "order_number": "ORD-1002",
+            "customer_id": str(customer_id),
+            "platform": "Direct",
+            "status": "Placed",
+            "placed_at": "2026-04-13",
+            "product_id": [str(product_id), str(product_id)],
+            "quantity": ["1"],
+            "unit_price": ["24.50", "24.50"],
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Each line item must include a product, quantity, and price." in response.data
+
+    with app.app_context():
+        assert Order.query.filter_by(order_number="ORD-1002").count() == 0

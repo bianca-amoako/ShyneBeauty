@@ -3,7 +3,16 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import inspect, select, text
 
-from shyne import AUTH_BIND_KEY, ACCOUNT_STATUS_ACTIVE, AdminUser, ROLE_STAFF_OPERATOR, ROLE_SUPERADMIN, db
+from shyne import (
+    AUTH_BIND_KEY,
+    ACCOUNT_STATUS_ACTIVE,
+    ACCOUNT_STATUS_SUSPENDED,
+    AdminUser,
+    ROLE_STAFF_OPERATOR,
+    ROLE_SUPERADMIN,
+    db,
+    utc_now,
+)
 
 
 @pytest.mark.parametrize(
@@ -120,6 +129,19 @@ def test_unknown_credentials_are_rejected(client):
 
     assert response.status_code == 200
     assert b"Invalid email or password." in response.data
+
+
+def test_authenticated_shell_includes_skip_link_and_live_region(
+    client, admin_user, login
+):
+    login(client)
+
+    response = client.get("/orders")
+
+    assert response.status_code == 200
+    assert b'href="#main-content"' in response.data
+    assert b'<main class="sb-main" id="main-content">' in response.data
+    assert b'<nav class="sb-sidebar"' in response.data
 
 
 def test_inactive_admin_cannot_log_in(client, app, login):
@@ -554,6 +576,46 @@ def test_forced_password_change_clears_requirement_and_restores_access(
         refreshed_user = db.session.get(AdminUser, user.id)
         assert refreshed_user.requires_password_change() is False
         assert refreshed_user.check_password("BrandNewPassw0rd!") is True
+
+
+def test_suspended_user_with_temporary_password_is_logged_out_before_password_change(
+    client, admin_factory, app, login
+):
+    user = admin_factory(
+        email="temp-suspended@shynebeauty.com",
+        full_name="Temp Suspended",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(
+        client,
+        email="temp-suspended@shynebeauty.com",
+        password="TempPassw0rd!",
+    )
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        refreshed_user.set_account_status(ACCOUNT_STATUS_SUSPENDED, now=utc_now())
+        db.session.commit()
+
+    response = client.post(
+        "/change-password?next=/orders",
+        data={
+            "password": "BrandNewPassw0rd!",
+            "password_confirmation": "BrandNewPassw0rd!",
+        },
+    )
+
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.requires_password_change() is True
+        assert refreshed_user.check_password("BrandNewPassw0rd!") is False
 
 
 def test_forced_password_change_rejects_missing_csrf_token(

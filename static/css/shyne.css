@@ -1204,13 +1204,18 @@ code {
     bottom: 0;
     width: min(300px, calc(100vw - 32px));
     transform: translateX(-105%);
-    transition: transform 0.15s ease;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.15s ease, visibility 0s linear 0.15s;
     z-index: 30;
     box-shadow: 14px 0 32px rgba(90, 76, 60, 0.18);
   }
 
   .sb-sidebar[data-open="true"] {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
 
   .sb-mobile-overlay[data-open="true"] {
