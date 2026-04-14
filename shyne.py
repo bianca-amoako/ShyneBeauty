@@ -3,6 +3,7 @@ import os
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urlparse
@@ -35,7 +36,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy.orm import validates
-from sqlalchemy import inspect, or_, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -1648,10 +1649,88 @@ def add_order():
 def add_inventory():
     return render_template("addInventoryItem.html")
 
-@app.route("/add-product")
-@login_required
+@app.route("/add-product", methods=["GET", "POST"])
+@require_permission(PERMISSION_PRODUCTION_EDIT)
 def add_product():
-    return render_template("addProduct.html")
+    form_data = {
+        "name": "",
+        "sku": "",
+        "status": "Active",
+        "price": "",
+        "reorder_threshold": "0",
+        "description": "",
+    }
+    created_product = None
+    created_sku = (request.args.get("created") or "").strip()
+
+    if created_sku:
+        created_product = Product.query.filter_by(sku=created_sku).first()
+
+    if request.method == "POST":
+        form_data = {
+            "name": (request.form.get("name") or "").strip(),
+            "sku": (request.form.get("sku") or "").strip(),
+            "status": (request.form.get("status") or "").strip() or "Active",
+            "price": (request.form.get("price") or "").strip(),
+            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip(),
+            "description": (request.form.get("description") or "").strip(),
+        }
+
+        errors = []
+        price = None
+        reorder_threshold = None
+
+        if not form_data["name"]:
+            errors.append("Product name is required.")
+        if not form_data["sku"]:
+            errors.append("SKU is required.")
+
+        if form_data["sku"]:
+            existing_product = Product.query.filter(
+                func.lower(Product.sku) == form_data["sku"].lower()
+            ).first()
+            if existing_product:
+                errors.append("A product with that SKU already exists.")
+
+        try:
+            price = Decimal(form_data["price"])
+            if price < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            errors.append("Price must be a valid non-negative amount.")
+
+        try:
+            reorder_threshold = int(form_data["reorder_threshold"])
+            if reorder_threshold < 0:
+                raise ValueError
+        except ValueError:
+            errors.append("Reorder threshold must be a non-negative whole number.")
+
+        if form_data["status"] not in {"Active", "Inactive"}:
+            errors.append("Status must be Active or Inactive.")
+
+        if not errors:
+            product = Product(
+                name=form_data["name"],
+                sku=form_data["sku"],
+                description=form_data["description"] or None,
+                price=price,
+                active=form_data["status"] == "Active",
+                reorder_threshold=reorder_threshold,
+            )
+            db.session.add(product)
+            db.session.commit()
+            flash("Product created.", "success")
+            return redirect(url_for("add_product", created=product.sku))
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template(
+        "addProduct.html",
+        form_data=form_data,
+        created_product=created_product,
+    )
     
 @app.route("/users")
 @require_permission(
