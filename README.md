@@ -32,15 +32,11 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 2. Install dependencies with `pip install -r requirements.txt`.
 3. Set `SECRET_KEY` before starting the app. The runtime will also load values
    from `.env`, `.env/local.env`, or `.env/.env` when present.
-4. Initialize the databases with `flask --app shyne.py init-db`.
-5. Create an admin account with
-   `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
-6. Optional local-only shortcut: set `ENABLE_DEV_TEST_ADMIN=true` and run
-   `flask --app shyne.py --debug seed-dev-admin` to seed a development login of
-   `admin` / `admin`. The login page only shows the credentials after that
-   seeding step has run.
-7. Start the dev server with `python shyne.py`.
-8. Open `http://localhost:8000/login` and sign in.
+4. Initialize demo data with `flask --app shyne.py init-db` if you want the
+   seeded sample dataset, or initialize empty schema with
+   `flask --app shyne.py init-live-db` for real staff use.
+5. Start the dev server with `python shyne.py`.
+6. Open `http://localhost:8000/login`.
 
 Example setup:
 
@@ -50,17 +46,66 @@ python -m venv .venv-windows
 pip install -r requirements.txt
 $env:SECRET_KEY = "replace-with-a-local-secret"
 flask --app shyne.py init-db
-flask --app shyne.py create-admin --email owner@shynebeauty.com
 python shyne.py
 ```
+
+## Seeded Demo Accounts
+
+`flask --app shyne.py init-db` seeds these deterministic example users:
+
+- `olivia.mercer@shynebeauty.com` / `ShyneDemoSuper1!` — `Superadmin`
+- `maya.brooks@shynebeauty.com` / `ShyneDemoStaff1!` — `Staff Operator`
+- `noah.kim@shynebeauty.com` / `ShyneDemoInventory1!` — `Inventory / Production`
+- `devops@shynebeauty.com` / `ShyneDemoDev1!` — `Dev Admin`
+
+Use these accounts for local demo and development only. `Dev Admin` remains
+hidden from the `Users & Access` table and is the only seeded role that can
+open `/admin/`.
 
 Optional variables:
 
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL`
-- `FLASK_DEBUG=true` for debugging
-- `ENABLE_DEV_TEST_ADMIN=true` for the local-only `seed-dev-admin` shortcut
+- `FLASK_DEBUG=true` for debugging only
 - `SESSION_COOKIE_SECURE=true` for HTTPS
+
+## Internal Launch Guidance
+
+For restricted internal staff use, prefer the schema-only bootstrap path and a
+WSGI server instead of the Flask development server.
+
+Recommended bootstrap:
+
+1. Set a non-demo `SECRET_KEY` outside git.
+2. Run `flask --app shyne.py init-live-db`.
+3. Create the first business admin with
+   `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
+4. Create a hidden technical admin only if you need Flask-Admin access:
+   `flask --app shyne.py create-dev-admin --email tech@shynebeauty.com`.
+5. Launch the app with Waitress:
+
+```bash
+python -m waitress --listen=127.0.0.1:8000 shyne:app
+```
+
+Notes:
+
+- `python shyne.py` remains the development server path only.
+- `init-db` is destructive and reseeds demo data; do not run it against live
+  operator data.
+- When `DATABASE_URL` and `AUTH_DATABASE_URL` are not overridden, the default
+  SQLite files live under `instance/`.
+- Set `SESSION_COOKIE_SECURE=true` when the app is served over HTTPS.
+
+## Backup And Restore
+
+- Stop the app before copying SQLite files.
+- Back up both databases together:
+  - `instance/shynebeauty.db`
+  - `instance/shynebeauty_auth.db`
+- Restore by replacing both files as a pair, then restarting the app.
+- If `DATABASE_URL` or `AUTH_DATABASE_URL` are overridden, back up those custom
+  paths instead of the defaults above.
 
 ## Password Hashing
 

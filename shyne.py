@@ -3020,6 +3020,15 @@ def init_db_command():
     print("Database initialized and demo data reset.")
 
 
+@app.cli.command("init-live-db")
+def init_live_db_command():
+    db.create_all(bind_key="__all__")
+    ensure_customer_source_column()
+    ensure_admin_user_access_columns()
+    db.session.commit()
+    click.echo("Database schema initialized without demo data.")
+
+
 def choose_default_business_role():
     has_business_admin = (
         AdminUser.query.filter(
