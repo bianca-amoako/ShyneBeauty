@@ -1,0 +1,122 @@
+{% extends "base_authenticated.html" %}
+{% from "_form_helpers.html" import csrf_input %}
+
+{% block page_title %}Account Settings{% endblock %}
+{% block page_description %}
+  <p>Manage your password and multi-factor authentication settings.</p>
+{% endblock %}
+
+{% block content %}
+  <section class="sb-panel" style="max-width: 720px;">
+    <h2>Change Password</h2>
+    <p class="sb-section-note">Use your current password to confirm this change. If MFA is enabled, enter a current authenticator code too.</p>
+    <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}">
+      {{ csrf_input() }}
+      <input type="hidden" name="action" value="change_password">
+      <div class="sb-field sb-field-float">
+        <input class="sb-input" id="current-password" name="current_password" type="password" autocomplete="current-password" placeholder=" " required>
+        <label for="current-password">Current Password</label>
+      </div>
+      <div class="sb-field sb-field-float">
+        <input class="sb-input" id="new-password" name="new_password" type="password" autocomplete="new-password" placeholder=" " required>
+        <label for="new-password">New Password</label>
+      </div>
+      <div class="sb-field sb-field-float">
+        <input class="sb-input" id="confirm-new-password" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" " required>
+        <label for="confirm-new-password">Confirm New Password</label>
+      </div>
+      {% if mfa_enabled %}
+        <div class="sb-field sb-field-float">
+          <input
+            class="sb-input"
+            id="password-mfa-code"
+            name="password_mfa_code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            placeholder=" "
+            required
+          >
+          <label for="password-mfa-code">Authentication Code</label>
+        </div>
+      {% endif %}
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Update Password</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="sb-panel" style="max-width: 720px;">
+    <h2>Multi-Factor Authentication</h2>
+    <p class="sb-section-note">
+      {% if mfa_enabled %}
+        MFA is currently enabled for this account and is required during sign-in.
+      {% else %}
+        MFA is currently disabled for this account. Enable it to require an authenticator code at sign-in.
+      {% endif %}
+    </p>
+
+    {% if not mfa_enabled %}
+      <div class="sb-grid sb-grid-2">
+        <div>
+          <h3>Authenticator QR Code</h3>
+          <div class="sb-mfa-qr" aria-hidden="true">
+            {{ qr_svg_markup|safe }}
+          </div>
+        </div>
+        <div>
+          <h3>Manual Setup Key</h3>
+          <p class="sb-note-box"><strong translate="no">{{ manual_secret }}</strong></p>
+          <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}">
+            {{ csrf_input() }}
+            <input type="hidden" name="action" value="enable_mfa">
+            <div class="sb-field sb-field-float">
+              <input
+                class="sb-input"
+                id="enable-mfa-code"
+                name="mfa_code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder=" "
+                required
+              >
+              <label for="enable-mfa-code">Authentication Code</label>
+            </div>
+            <div class="sb-form-actions">
+              <button class="sb-button" type="submit">Enable MFA</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <p class="sb-note-box"><strong>Status:</strong> Enabled</p>
+      <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}" style="max-width: 420px;">
+        {{ csrf_input() }}
+        <input type="hidden" name="action" value="disable_mfa">
+        <div class="sb-field sb-field-float">
+          <input
+            class="sb-input"
+            id="disable-mfa-code"
+            name="disable_mfa_code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            placeholder=" "
+            required
+          >
+          <label for="disable-mfa-code">Authentication Code</label>
+        </div>
+        <div class="sb-form-actions">
+          <button class="sb-button-danger" type="submit">Disable MFA</button>
+        </div>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

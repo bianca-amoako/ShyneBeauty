@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+import pyotp
 import pytest
 from sqlalchemy import inspect, select, text
 
@@ -7,7 +8,10 @@ from shyne import (
     AUTH_BIND_KEY,
     ACCOUNT_STATUS_ACTIVE,
     ACCOUNT_STATUS_SUSPENDED,
+    AdminLoginThrottle,
     AdminUser,
+    HTML_CONTENT_SECURITY_POLICY,
+    IP_LOGIN_FAILURE_THRESHOLD,
     ROLE_STAFF_OPERATOR,
     ROLE_SUPERADMIN,
     db,
@@ -30,9 +34,25 @@ def test_login_route_sets_security_headers(client):
 
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Pragma"] == "no-cache"
+    assert response.headers["Content-Security-Policy"] == HTML_CONTENT_SECURITY_POLICY
     assert response.headers["Referrer-Policy"] == "same-origin"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+
+
+def test_login_and_authenticated_shell_use_local_font_assets(client, admin_user, login):
+    login_response = client.get("/login")
+
+    assert b"fonts.googleapis.com" not in login_response.data
+    assert b"fonts.gstatic.com" not in login_response.data
+    assert b"/static/css/fonts.css" in login_response.data
+
+    login(client)
+    shell_response = client.get("/orders")
+
+    assert b"fonts.googleapis.com" not in shell_response.data
+    assert b"fonts.gstatic.com" not in shell_response.data
+    assert b"/static/css/fonts.css" in shell_response.data
 
 
 def test_login_rejects_missing_csrf_token(csrf_client, admin_user):
@@ -474,11 +494,11 @@ def test_seeded_demo_user_still_locks_after_repeated_failed_attempts(client, app
 @pytest.mark.parametrize(
     ("route", "expected_text"),
     [
-        ("/", b"Home Dashboard / Analytics"),
+        ("/", b"Dashboard"),
         ("/orders", b"Manage Orders"),
-        ("/tasks", b"Task List"),
+        ("/tasks", b"Tasks"),
         ("/customers", b"Customer Database"),
-        ("/inventory", b"Inventory Page"),
+        ("/inventory", b"Inventory"),
         ("/users", b"Users & Access"),
     ],
 )
@@ -720,6 +740,485 @@ def test_forced_password_change_normalizes_safe_backslash_next_targets(
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/orders?status=open")
+
+
+def test_forced_password_change_rejects_short_password(client, admin_factory, login):
+    admin_factory(
+        email="temp-short@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(client, email="temp-short@shynebeauty.com", password="TempPassw0rd!")
+    response = client.post(
+        "/change-password",
+        data={
+            "password": "shortpass1!",
+            "password_confirmation": "shortpass1!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"Password must be at least 12 characters." in response.data
+
+
+def test_forced_password_change_rejects_password_containing_email(client, admin_factory, login):
+    admin_factory(
+        email="olivia@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        must_change_password=True,
+        password="TempPassw0rd!",
+    )
+
+    login(client, email="olivia@shynebeauty.com", password="TempPassw0rd!")
+    response = client.post(
+        "/change-password",
+        data={
+            "password": "OliviaSecure123!",
+            "password_confirmation": "OliviaSecure123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"Password cannot contain your email address." in response.data
+
+
+def test_ip_throttle_triggers_after_repeated_failures(client, app):
+    for _ in range(IP_LOGIN_FAILURE_THRESHOLD):
+        response = client.post(
+            "/login",
+            data={
+                "email": "missing@shynebeauty.com",
+                "password": "wrong-password",
+            },
+            environ_base={"REMOTE_ADDR": "10.0.0.8"},
+        )
+        assert response.status_code == 200
+        assert b"Invalid email or password." in response.data
+
+    with app.app_context():
+        throttle = AdminLoginThrottle.query.filter_by(ip_address="10.0.0.8").one()
+        assert throttle.failed_login_count == IP_LOGIN_FAILURE_THRESHOLD
+        assert throttle.locked_until is not None
+
+
+def test_ip_throttle_blocks_login_for_valid_account(client, admin_user):
+    for _ in range(IP_LOGIN_FAILURE_THRESHOLD):
+        client.post(
+            "/login",
+            data={
+                "email": "missing@shynebeauty.com",
+                "password": "wrong-password",
+            },
+            environ_base={"REMOTE_ADDR": "10.0.0.9"},
+        )
+
+    response = client.post(
+        "/login",
+        data={
+            "email": "admin@shynebeauty.com",
+            "password": "correct-horse-battery-staple",
+        },
+        environ_base={"REMOTE_ADDR": "10.0.0.9"},
+    )
+
+    assert response.status_code == 200
+    assert b"Invalid email or password." in response.data
+
+
+def test_ip_throttle_isolated_by_client_ip(client, admin_user, login):
+    for _ in range(IP_LOGIN_FAILURE_THRESHOLD):
+        client.post(
+            "/login",
+            data={
+                "email": "missing@shynebeauty.com",
+                "password": "wrong-password",
+            },
+            environ_base={"REMOTE_ADDR": "10.0.0.10"},
+        )
+
+    response = login(client, next_url="/orders")
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders")
+
+
+def test_expired_ip_throttle_allows_login_again(client, admin_user, app, login):
+    with app.app_context():
+        throttle = AdminLoginThrottle(ip_address="10.0.0.11")
+        throttle.failed_login_count = IP_LOGIN_FAILURE_THRESHOLD
+        throttle.locked_until = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.session.add(throttle)
+        db.session.commit()
+
+    response = client.post(
+        "/login",
+        data={
+            "email": "admin@shynebeauty.com",
+            "password": "correct-horse-battery-staple",
+        },
+        environ_base={"REMOTE_ADDR": "10.0.0.11"},
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
+
+    with app.app_context():
+        throttle = AdminLoginThrottle.query.filter_by(ip_address="10.0.0.11").one()
+        assert throttle.failed_login_count == 0
+        assert throttle.locked_until is None
+
+
+def test_first_login_password_change_allows_skipping_optional_mfa(
+    client, admin_factory, app, login
+):
+    user = admin_factory(
+        email="first-login@shynebeauty.com",
+        role=ROLE_SUPERADMIN,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        must_change_password=True,
+    )
+
+    response = login(client, email="first-login@shynebeauty.com", password="ValidPassw0rd!")
+
+    assert response.status_code == 302
+    assert "/change-password" in response.headers["Location"]
+
+    change_password_page = client.get("/change-password")
+
+    assert change_password_page.status_code == 200
+    assert b"Enable MFA for this account now" in change_password_page.data
+
+    completion_response = client.post(
+        "/change-password",
+        data={
+            "password": "FirstLoginPass123",
+            "password_confirmation": "FirstLoginPass123",
+        },
+        follow_redirects=True,
+    )
+
+    assert completion_response.status_code == 200
+    assert b"Password updated." in completion_response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.requires_password_change() is False
+        assert refreshed_user.check_password("FirstLoginPass123") is True
+        assert refreshed_user.has_mfa_enabled() is False
+
+
+def test_first_login_password_change_can_enable_mfa(client, admin_factory, app, login):
+    user = admin_factory(
+        email="mfa-setup@shynebeauty.com",
+        role=ROLE_SUPERADMIN,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        must_change_password=True,
+    )
+
+    login(client, email="mfa-setup@shynebeauty.com", password="ValidPassw0rd!")
+    change_password_page = client.get("/change-password")
+
+    assert change_password_page.status_code == 200
+    assert b"Manual Setup Key" in change_password_page.data
+
+    with client.session_transaction() as session_data:
+        enrollment_secret = session_data["mfa_enrollment_secret"]
+
+    code = pyotp.TOTP(enrollment_secret).now()
+    response = client.post(
+        "/change-password",
+        data={
+            "password": "FirstLoginPass123",
+            "password_confirmation": "FirstLoginPass123",
+            "enable_mfa": "on",
+            "mfa_code": code,
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Password updated." in response.data
+    assert b"Multi-factor authentication enabled." in response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.has_mfa_enabled() is True
+        assert refreshed_user.must_enroll_mfa is False
+        assert refreshed_user.requires_password_change() is False
+
+
+def test_mfa_challenge_completes_login_for_enabled_account(
+    client, admin_factory, app, login, totp_code_for
+):
+    user = admin_factory(
+        email="mfa-user@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        mfa_enabled=True,
+    )
+
+    first_response = login(
+        client,
+        email="mfa-user@shynebeauty.com",
+        password="ValidPassw0rd!",
+    )
+
+    assert first_response.status_code == 302
+    assert first_response.headers["Location"].endswith("/mfa/challenge")
+
+    challenge_response = login(
+        client,
+        email="mfa-user@shynebeauty.com",
+        password="ValidPassw0rd!",
+        mfa_code=totp_code_for(user.id),
+    )
+
+    assert challenge_response.status_code == 302
+    assert challenge_response.headers["Location"].endswith("/")
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.last_mfa_verified_at is not None
+
+
+def test_invalid_mfa_code_does_not_authenticate(client, admin_factory, login):
+    admin_factory(
+        email="mfa-bad@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        mfa_enabled=True,
+    )
+
+    response = login(
+        client,
+        email="mfa-bad@shynebeauty.com",
+        password="ValidPassw0rd!",
+        mfa_code="000000",
+    )
+
+    assert response.status_code == 200
+    assert b"Enter a valid authentication code." in response.data
+
+    with client.session_transaction() as session_data:
+        assert session_data.get("_user_id") is None
+
+
+def test_mfa_disabled_user_logs_in_without_challenge(client, admin_factory, login):
+    admin_factory(
+        email="staff-mfa@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+    )
+
+    response = login(
+        client,
+        email="staff-mfa@shynebeauty.com",
+        password="ValidPassw0rd!",
+        next_url="/orders",
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/orders")
+
+
+def test_authenticated_user_can_view_account_settings(client, admin_user, login):
+    login(client)
+
+    response = client.get("/account/settings")
+
+    assert response.status_code == 200
+    assert b"Account Settings" in response.data
+    assert b"Change Password" in response.data
+
+
+def test_account_settings_password_change_succeeds_without_mfa_when_disabled(
+    client, admin_factory, app, login
+):
+    user = admin_factory(
+        email="settings-no-mfa@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+    )
+
+    login(client, email="settings-no-mfa@shynebeauty.com", password="ValidPassw0rd!")
+
+    response = client.post(
+        "/account/settings",
+        data={
+            "action": "change_password",
+            "current_password": "ValidPassw0rd!",
+            "new_password": "SettingsPass123",
+            "password_confirmation": "SettingsPass123",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Password updated." in response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.check_password("SettingsPass123") is True
+
+
+def test_account_settings_password_change_requires_valid_mfa_code_when_enabled(
+    client, admin_factory, app, login, totp_code_for
+):
+    user = admin_factory(
+        email="settings-mfa@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        mfa_enabled=True,
+    )
+
+    login(
+        client,
+        email="settings-mfa@shynebeauty.com",
+        password="ValidPassw0rd!",
+        mfa_code=totp_code_for(user.id),
+    )
+
+    missing_code_response = client.post(
+        "/account/settings",
+        data={
+            "action": "change_password",
+            "current_password": "ValidPassw0rd!",
+            "new_password": "SettingsPass123",
+            "password_confirmation": "SettingsPass123",
+        },
+        follow_redirects=True,
+    )
+
+    assert missing_code_response.status_code == 200
+    assert (
+        b"Authentication code is required to change your password."
+        in missing_code_response.data
+    )
+
+    invalid_code_response = client.post(
+        "/account/settings",
+        data={
+            "action": "change_password",
+            "current_password": "ValidPassw0rd!",
+            "new_password": "SettingsPass123",
+            "password_confirmation": "SettingsPass123",
+            "password_mfa_code": "000000",
+        },
+        follow_redirects=True,
+    )
+
+    assert invalid_code_response.status_code == 200
+    assert b"Enter a valid authentication code." in invalid_code_response.data
+
+    success_response = client.post(
+        "/account/settings",
+        data={
+            "action": "change_password",
+            "current_password": "ValidPassw0rd!",
+            "new_password": "SettingsPass123",
+            "password_confirmation": "SettingsPass123",
+            "password_mfa_code": totp_code_for(user.id),
+        },
+        follow_redirects=True,
+    )
+
+    assert success_response.status_code == 200
+    assert b"Password updated." in success_response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.check_password("SettingsPass123") is True
+
+
+def test_account_settings_can_enable_mfa(client, admin_factory, app, login):
+    user = admin_factory(
+        email="enable-mfa@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+    )
+
+    login(client, email="enable-mfa@shynebeauty.com", password="ValidPassw0rd!")
+    settings_page = client.get("/account/settings")
+
+    assert settings_page.status_code == 200
+    assert b"Enable MFA" in settings_page.data
+
+    with client.session_transaction() as session_data:
+        enrollment_secret = session_data["mfa_enrollment_secret"]
+
+    response = client.post(
+        "/account/settings",
+        data={
+            "action": "enable_mfa",
+            "mfa_code": pyotp.TOTP(enrollment_secret).now(),
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Multi-factor authentication enabled." in response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.has_mfa_enabled() is True
+
+
+def test_account_settings_disable_mfa_requires_valid_code(
+    client, admin_factory, app, login, totp_code_for
+):
+    user = admin_factory(
+        email="disable-mfa@shynebeauty.com",
+        role=ROLE_STAFF_OPERATOR,
+        account_status=ACCOUNT_STATUS_ACTIVE,
+        password="ValidPassw0rd!",
+        mfa_enabled=True,
+    )
+
+    login(
+        client,
+        email="disable-mfa@shynebeauty.com",
+        password="ValidPassw0rd!",
+        mfa_code=totp_code_for(user.id),
+    )
+
+    invalid_response = client.post(
+        "/account/settings",
+        data={
+            "action": "disable_mfa",
+            "disable_mfa_code": "000000",
+        },
+        follow_redirects=True,
+    )
+
+    assert invalid_response.status_code == 200
+    assert b"Enter a valid authentication code." in invalid_response.data
+
+    success_response = client.post(
+        "/account/settings",
+        data={
+            "action": "disable_mfa",
+            "disable_mfa_code": totp_code_for(user.id),
+        },
+        follow_redirects=True,
+    )
+
+    assert success_response.status_code == 200
+    assert b"Multi-factor authentication disabled." in success_response.data
+
+    with app.app_context():
+        refreshed_user = db.session.get(AdminUser, user.id)
+        assert refreshed_user.has_mfa_enabled() is False
 
 
 def test_superadmin_is_denied_admin_console_access(client, admin_user, login):

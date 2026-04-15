@@ -4,6 +4,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pyotp
 import pytest
 
 # tests can import the app module if pytest is run from repo root or different working directory.
@@ -36,6 +37,23 @@ from shyne import app as flask_app
 from shyne import db
 from shyne import utc_now
 
+BASE_SQLALCHEMY_DATABASE_URI = flask_app.config["SQLALCHEMY_DATABASE_URI"]
+BASE_SQLALCHEMY_BINDS = dict(flask_app.config["SQLALCHEMY_BINDS"])
+BASE_APP_RUNTIME = flask_app.config["APP_RUNTIME"]
+BASE_RUNTIME_DEFAULT_DATABASES = dict(flask_app.config["RUNTIME_DEFAULT_DATABASES"])
+
+
+def reset_database_schema():
+    db.session.remove()
+    db.engine.dispose()
+    db.engines["auth"].dispose()
+    for db_path in (PRIMARY_TEST_DB, AUTH_TEST_DB):
+        if db_path.exists():
+            db_path.unlink()
+    for bind_key, metadata in db.metadatas.items():
+        engine = db.engine if bind_key is None else db.engines[bind_key]
+        metadata.create_all(bind=engine, checkfirst=True)
+
 
 @pytest.fixture()
 def app():
@@ -44,16 +62,19 @@ def app():
         DEBUG=False,
         SECRET_KEY="test-secret-key",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        APP_RUNTIME=BASE_APP_RUNTIME,
+        SQLALCHEMY_DATABASE_URI=BASE_SQLALCHEMY_DATABASE_URI,
+        SQLALCHEMY_BINDS=dict(BASE_SQLALCHEMY_BINDS),
+        RUNTIME_DEFAULT_DATABASES=dict(BASE_RUNTIME_DEFAULT_DATABASES),
         ENABLE_DEV_TEST_ADMIN=False,
+        TRUST_PROXY_HEADERS=False,
         WTF_CSRF_ENABLED=False,
     )
 
     with flask_app.app_context():
-        db.drop_all(bind_key="__all__")
-        db.create_all(bind_key="__all__")
+        reset_database_schema()
         yield flask_app
-        db.session.remove()
-        db.drop_all(bind_key="__all__")
+        reset_database_schema()
 
 
 @pytest.fixture()
@@ -97,6 +118,7 @@ def login():
         password="correct-horse-battery-staple",
         remember_me=False,
         next_url=None,
+        mfa_code=None,
     ):
         data = {
             "email": email,
@@ -109,11 +131,20 @@ def login():
         if next_url is not None:
             data["next"] = next_url
 
-        return client.post(
+        response = client.post(
             "/login",
             data=data,
             query_string={"next": next_url} if next_url is not None else None,
         )
+
+        if mfa_code is not None:
+            challenge_data = {"code": mfa_code}
+            if client.application.config.get("WTF_CSRF_ENABLED"):
+                challenge_data["csrf_token"] = extract_csrf_token(
+                    client.get("/mfa/challenge").data
+                )
+            return client.post("/mfa/challenge", data=challenge_data)
+        return response
 
     return _login
 
@@ -150,6 +181,9 @@ def admin_factory(app):
             locked_until=None,
             last_login_at=None,
             permission_overrides=None,
+            must_enroll_mfa=False,
+            mfa_enabled=False,
+            mfa_totp_secret=None,
         ):
             created_count["value"] += 1
             comparison_time = utc_now()
@@ -174,6 +208,11 @@ def admin_factory(app):
             if account_status == ACCOUNT_STATUS_INVITED:
                 user.invited_by_user_id = 1
             user.must_change_password = must_change_password
+            user.must_enroll_mfa = must_enroll_mfa
+            if mfa_enabled:
+                user.mfa_enabled = True
+                user.mfa_totp_secret = mfa_totp_secret or pyotp.random_base32()
+                user.mfa_enrolled_at = comparison_time
             if permission_overrides is not None:
                 user.set_permission_overrides(permission_overrides)
             db.session.add(user)
@@ -205,6 +244,18 @@ def dev_admin_user(app, admin_factory):
             account_status=ACCOUNT_STATUS_ACTIVE,
         )
         return user.id
+
+
+@pytest.fixture()
+def totp_code_for(app):
+    def _totp_code_for(user_id):
+        with app.app_context():
+            user = db.session.get(AdminUser, user_id)
+            assert user is not None
+            assert user.mfa_totp_secret
+            return pyotp.TOTP(user.mfa_totp_secret).now()
+
+    return _totp_code_for
 
 
 @pytest.fixture()

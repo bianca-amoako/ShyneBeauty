@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MFA Challenge | ShyneBeauty</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='shyneIcon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shyne.css') }}">
+</head>
+<body class="sb-login-body">
+  {% from "_form_helpers.html" import csrf_input %}
+  <main class="sb-login-shell">
+    <section class="sb-login-panel sb-panel-glass" aria-labelledby="mfa-heading">
+      <p class="sb-eyebrow">Multi-factor authentication</p>
+      <h1 id="mfa-heading">Enter Your Authenticator Code</h1>
+      <p class="sb-helper">
+        Finish signing in for <strong>{{ pending_user.email }}</strong>. Use the
+        current 6-digit code from your authenticator app.
+      </p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="sb-message-stack" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="sb-message sb-message-{{ category }}" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form class="sb-form-grid" method="post" action="{{ url_for('mfa_challenge') }}" novalidate>
+        {{ csrf_input() }}
+        {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+        {% endif %}
+        <div class="sb-field sb-field-float">
+          <input
+            class="sb-input"
+            id="mfa-code"
+            name="code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            placeholder=" "
+            spellcheck="false"
+            required
+            autofocus
+          >
+          <label for="mfa-code">Authentication Code</label>
+        </div>
+        <div class="sb-form-actions">
+          <button class="sb-submit" type="submit">Verify &amp; Continue</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
