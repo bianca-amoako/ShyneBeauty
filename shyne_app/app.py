@@ -1,7 +1,8 @@
 from .config import *
 from .extensions import app, init_extensions
 
-load_project_env()
+# Config docs and local setup store dotenv files at project root
+load_project_env(BASE_DIR.parent)
 app.config["SECRET_KEY"] = require_env("SECRET_KEY")
 runtime_database_config = resolve_runtime_database_config(BASE_DIR.parent)
 app.config["APP_RUNTIME"] = runtime_database_config["runtime"]
