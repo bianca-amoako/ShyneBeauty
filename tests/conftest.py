@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 import pyotp
@@ -13,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
-TEST_DB_DIR = Path(tempfile.gettempdir()) / "shynebeauty-pytest"
+TEST_DB_DIR = Path(tempfile.gettempdir()) / f"shynebeauty-pytest-{os.getpid()}-{uuid.uuid4().hex}"
 TEST_DB_DIR.mkdir(parents=True, exist_ok=True)
 PRIMARY_TEST_DB = TEST_DB_DIR / "test_shynebeauty.db"
 AUTH_TEST_DB = TEST_DB_DIR / "test_shynebeauty_auth.db"
@@ -45,14 +46,8 @@ BASE_RUNTIME_DEFAULT_DATABASES = dict(flask_app.config["RUNTIME_DEFAULT_DATABASE
 
 def reset_database_schema():
     db.session.remove()
-    db.engine.dispose()
-    db.engines["auth"].dispose()
-    for db_path in (PRIMARY_TEST_DB, AUTH_TEST_DB):
-        if db_path.exists():
-            db_path.unlink()
-    for bind_key, metadata in db.metadatas.items():
-        engine = db.engine if bind_key is None else db.engines[bind_key]
-        metadata.create_all(bind=engine, checkfirst=True)
+    db.drop_all(bind_key="__all__")
+    db.create_all(bind_key="__all__")
 
 
 @pytest.fixture()

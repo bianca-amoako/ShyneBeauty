@@ -169,14 +169,23 @@ Run the local test suite with one of these commands:
 ```
 
 ```bash
-APP_RUNTIME=demo-dev python -m pytest -q
+APP_RUNTIME=demo-dev ./.venv/bin/python -m pytest -q -m "not a11y_smoke"
+```
+
+Run the Playwright accessibility smoke suite separately:
+
+```bash
+APP_RUNTIME=demo-dev ./.venv/bin/python -m pytest -q tests/test_accessibility_smoke.py
 ```
 
 GitHub Actions workflows:
 
 - `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
-- `.github/workflows/pytest.yml` also runs Playwright-based accessibility smoke
-  coverage for `/login`, `/`, `/orders`, `/tasks`, and `/account/settings`
+- the generic pytest matrix excludes the `a11y_smoke` marker so browser-only
+  checks do not run without Playwright Chromium installed
+- `.github/workflows/pytest.yml` runs Playwright-based accessibility smoke
+  coverage for `/login`, `/`, `/orders`, `/tasks`, and `/account/settings` in
+  the dedicated `a11y-smoke` job after installing Chromium
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce
   new high-severity vulnerable dependencies
