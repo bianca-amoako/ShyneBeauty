@@ -1,78 +1,162 @@
 {% extends "base_authenticated.html" %}
 
-{% block title %}Task List{% endblock %}
-{% block page_title %}Task List{% endblock %}
+{% block page_title %}Tasks{% endblock %}
 {% block page_description %}
-  <p>Current prototype task surface for reviewing workflow shape and presentation readiness.</p>
+  <p>Review live operational work that needs attention across order intake, shipping, and inventory.</p>
 {% endblock %}
 {% block page_actions %}
-  <a class="sb-button" href="{{ url_for('orders') }}">Open live orders view</a>
-  <a class="sb-button-secondary" href="{{ url_for('add_order') }}">Review add-order layout</a>
+  <a class="sb-button" href="{{ url_for('orders') }}">Open orders</a>
+  <a class="sb-button-secondary" href="{{ url_for('inventory') }}">Open inventory</a>
 {% endblock %}
 
 {% block content %}
   <section class="sb-grid sb-grid-3">
-    <article class="sb-panel">
-      <h2>Status</h2>
-      <p class="sb-section-note">
-        This page is still a prototype. It is useful for layout review and capstone
-        planning, but it is not backed by a persisted task model yet.
-      </p>
+    <article class="sb-panel sb-metric">
+      <strong>{{ intake_count }}</strong>
+      <span>Orders awaiting intake review</span>
     </article>
-    <article class="sb-panel">
-      <h2>Use the live pages for</h2>
-      <ul class="sb-list">
-        <li>Order intake and status review</li>
-        <li>Customer lookup and source verification</li>
-        <li>Inventory constraint checks before production</li>
-      </ul>
+    <article class="sb-panel sb-metric">
+      <strong>{{ shipping_count }}</strong>
+      <span>Orders ready for shipping handoff</span>
     </article>
-    <article class="sb-panel">
-      <h2>Still needed later</h2>
-      <ul class="sb-list">
-        <li>Persisted task records</li>
-        <li>Status update actions</li>
-        <li>Assignment and due-date workflow</li>
-      </ul>
+    <article class="sb-panel sb-metric">
+      <strong>{{ inventory_attention_count }}</strong>
+      <span>Inventory items needing attention</span>
     </article>
   </section>
 
   <section class="sb-panel" style="margin-top: 16px;">
-    <h2>Prototype Workflow Snapshot</h2>
+    <h2>Order Intake Review</h2>
+    <p class="sb-section-note">
+      Confirm customer details, source records, and line items for newly placed orders before work moves forward.
+      Use <a class="sb-link" href="{{ url_for('orders') }}">Manage Orders</a> for the full order queue and
+      <a class="sb-link" href="{{ url_for('customers') }}">Customers</a> to verify contact details.
+    </p>
     <div class="sb-table-wrap">
       <table class="sb-data-table sb-responsive-table">
-        <caption>Draft task examples used for planning and demo rehearsal</caption>
+        <caption>Orders currently in placed status</caption>
         <thead>
           <tr>
-            <th scope="col">Task</th>
-            <th scope="col">Purpose</th>
-            <th scope="col">Suggested owner</th>
-            <th scope="col">Priority</th>
-            <th scope="col">State</th>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Source</th>
+            <th scope="col">Items</th>
+            <th scope="col">Placed</th>
           </tr>
         </thead>
         <tbody>
+          {% for order in intake_orders %}
+            <tr>
+              <td data-label="Order">{{ order.order_number }}</td>
+              <td data-label="Customer">{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+              <td data-label="Source">{{ order.platform }}</td>
+              <td data-label="Items">
+                {% for item in order.order_items %}
+                  {{ item.product.name }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  No line items
+                {% endfor %}
+              </td>
+              <td data-label="Placed">{{ order.placed_at }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No orders are currently waiting for intake review.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Shipping Handoff</h2>
+    <p class="sb-section-note">
+      Review ready orders, confirm carrier details, and make sure tracking is present before final handoff.
+    </p>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Orders ready for shipping</caption>
+        <thead>
           <tr>
-            <td data-label="Task">Review new order intake</td>
-            <td data-label="Purpose">Confirm source, quantity, and customer details before production work starts.</td>
-            <td data-label="Suggested owner">Staff Operator</td>
-            <td data-label="Priority">High</td>
-            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Items</th>
+            <th scope="col">Shipment</th>
+            <th scope="col">Status</th>
           </tr>
+        </thead>
+        <tbody>
+          {% for order in shipping_orders %}
+            <tr>
+              <td data-label="Order">{{ order.order_number }}</td>
+              <td data-label="Customer">{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+              <td data-label="Items">
+                {% for item in order.order_items %}
+                  {{ item.product.name }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  No line items
+                {% endfor %}
+              </td>
+              <td data-label="Shipment">
+                {% if order.shipment and order.shipment.tracking_number %}
+                  {{ order.shipment.carrier or "Carrier pending" }}: {{ order.shipment.tracking_number }}
+                {% elif order.shipment %}
+                  {{ order.shipment.carrier or "Carrier pending" }}: Tracking pending
+                {% else %}
+                  Shipment not created
+                {% endif %}
+              </td>
+              <td data-label="Status"><span class="sb-status sb-status-active">{{ order.status }}</span></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No orders are currently ready for shipping handoff.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Inventory Attention</h2>
+    <p class="sb-section-note">
+      Triage ingredients and supplies that are low or out of stock before they block production work.
+      Use <a class="sb-link" href="{{ url_for('inventory') }}">Inventory</a> for the full stock view.
+    </p>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Inventory items at or below reorder threshold</caption>
+        <thead>
           <tr>
-            <td data-label="Task">Check ingredient availability</td>
-            <td data-label="Purpose">Use inventory counts to spot missing stock before the order enters a production batch.</td>
-            <td data-label="Suggested owner">Inventory / Production</td>
-            <td data-label="Priority">Medium</td>
-            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
+            <th scope="col">Item</th>
+            <th scope="col">Current Stock</th>
+            <th scope="col">Reorder Level</th>
+            <th scope="col">Supplier</th>
+            <th scope="col">Attention</th>
           </tr>
-          <tr>
-            <td data-label="Task">Prepare shipping handoff</td>
-            <td data-label="Purpose">Verify packaging and tracking creation before an order is marked shipped.</td>
-            <td data-label="Suggested owner">Staff Operator</td>
-            <td data-label="Priority">Medium</td>
-            <td data-label="State"><span class="sb-status sb-status-pending">Prototype only</span></td>
-          </tr>
+        </thead>
+        <tbody>
+          {% for item in inventory_attention_items %}
+            <tr>
+              <td data-label="Item">{{ item.name }}</td>
+              <td data-label="Current Stock">{{ item.stock_quantity }} {{ item.unit }}</td>
+              <td data-label="Reorder Level">{{ item.reorder_threshold }} {{ item.unit }}</td>
+              <td data-label="Supplier">{{ item.supplier_name or "Not set" }}</td>
+              <td data-label="Attention">
+                {% if item.stock_quantity == 0 %}
+                  <span class="sb-status sb-status-danger">Out of stock</span>
+                {% else %}
+                  <span class="sb-status sb-status-pending">Low stock</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No inventory items currently need attention.</td>
+            </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

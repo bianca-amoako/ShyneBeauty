@@ -11,7 +11,8 @@ protected admin screens plus a live Flask-Admin surface for internal use.
   flow, Flask-Admin registration, routes, and CLI commands.
 - `/login` is a live admin sign-in flow with safe redirect handling, generic
   credential failure messaging, remember-me support, account lockout after
-  repeated failed attempts, and CSRF protection on POST routes.
+  repeated failed attempts, IP-aware throttling, optional TOTP MFA challenge
+  for any enrolled account, and CSRF protection on POST routes.
 - `/`, `/orders`, `/customers`, and `/inventory` are protected admin pages
   rendered with Jinja templates and backed by live database queries.
 - `/add-customer`, `/add-order`, `/add-inventory`, and `/add-product` are live
@@ -22,7 +23,8 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 - `/admin/` is protected behind admin authentication and exposes registered
   business tables through Flask-Admin for local/internal development work.
 - CI runs pytest on Python 3.10 and 3.12, CodeQL analysis, dependency review
-  on pull requests, and a Gitleaks secret scan on pushes and pull requests.
+  on pull requests, an accessibility smoke check in Chromium, and a Gitleaks
+  secret scan on pushes and pull requests.
 - Dependabot is configured to open weekly update PRs for Python dependencies
   and GitHub Actions workflow dependencies.
 
@@ -45,6 +47,7 @@ python -m venv .venv-windows
 .\.venv-windows\Scripts\Activate.ps1
 pip install -r requirements.txt
 $env:SECRET_KEY = "replace-with-a-local-secret"
+$env:APP_RUNTIME = "demo-dev"
 flask --app shyne.py init-db
 python shyne.py
 ```
@@ -64,46 +67,89 @@ open `/admin/`.
 
 Optional variables:
 
+- `APP_RUNTIME=demo-dev|live-prod`
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL`
 - `FLASK_DEBUG=true` for debugging only
 - `SESSION_COOKIE_SECURE=true` for HTTPS
+- `TRUST_PROXY_HEADERS=true` only when the app is behind a trusted reverse proxy
+
+Unset runtime means demo. Live requires explicit `APP_RUNTIME=live-prod`.
 
 ## Internal Launch Guidance
 
 For restricted internal staff use, prefer the schema-only bootstrap path and a
-WSGI server instead of the Flask development server.
+Linux WSGI server behind a reverse proxy instead of the Flask development server.
 
 Recommended bootstrap:
 
 1. Set a non-demo `SECRET_KEY` outside git.
-2. Run `flask --app shyne.py init-live-db`.
-3. Create the first business admin with
+2. Set `APP_RUNTIME=live-prod`.
+3. Run `flask --app shyne.py init-live-db`.
+4. Create the first business admin with
    `flask --app shyne.py create-admin --email owner@shynebeauty.com`.
-4. Create a hidden technical admin only if you need Flask-Admin access:
+5. Create a hidden technical admin only if you need Flask-Admin access:
    `flask --app shyne.py create-dev-admin --email tech@shynebeauty.com`.
-5. Launch the app with Waitress:
+6. Launch the app with Gunicorn behind nginx or Caddy:
 
 ```bash
-python -m waitress --listen=127.0.0.1:8000 shyne:app
+APP_RUNTIME=live-prod gunicorn --bind 127.0.0.1:8000 shyne:app
 ```
 
 Notes:
 
-- `python shyne.py` remains the development server path only.
+- `python shyne.py` remains the development server path only and defaults to
+  `APP_RUNTIME=demo-dev` when `APP_RUNTIME` is unset.
+- Unset runtime means demo. Live requires explicit `APP_RUNTIME=live-prod`.
 - `init-db` is destructive and reseeds demo data; do not run it against live
   operator data.
-- When `DATABASE_URL` and `AUTH_DATABASE_URL` are not overridden, the default
-  SQLite files live under `instance/`.
+- When `DATABASE_URL` and `AUTH_DATABASE_URL` are not overridden, runtime mode
+  selects the default SQLite files under `instance/`:
+  - `demo-dev` -> `instance/shynebeauty_demo.db`,
+    `instance/shynebeauty_demo_auth.db`
+  - `live-prod` -> `instance/shynebeauty_live.db`,
+    `instance/shynebeauty_live_auth.db`
 - Set `SESSION_COOKIE_SECURE=true` when the app is served over HTTPS.
+- Runtime-sensitive defaults:
+  - `demo-dev` defaults `SESSION_COOKIE_SECURE=False`
+  - `live-prod` defaults `SESSION_COOKIE_SECURE=True`
+  - `TRUST_PROXY_HEADERS` defaults `False` in both modes unless explicitly set
+  - `ENABLE_DEV_TEST_ADMIN` is forced off in `live-prod`
+  - `FLASK_DEBUG` must not be enabled in `live-prod`
+- `create-admin` and `create-dev-admin` enforce the password policy used by the
+  web flows: minimum 12 characters, no email-address fragments, and no demo or
+  common fallback credentials.
+- MFA is optional for all accounts. Temporary-password onboarding can opt into
+  MFA during the first `/change-password` flow, and authenticated users can
+  manage password changes and MFA from `/account/settings`.
 
 ## Backup And Restore
 
-- Stop the app before copying SQLite files.
+- Primary owner: business `Superadmin`
+- Secondary owner: `Dev Admin` / technical maintainer
+- Cadence:
+  - weekly paired backup of both SQLite files
+  - extra backup before schema, auth, or admin-access changes
+  - monthly restore drill against a non-live copy
+- Pre-backup checks:
+  - confirm which database paths are active
+  - stop the app or place it in a maintenance window before copying files
 - Back up both databases together:
   - `instance/shynebeauty.db`
   - `instance/shynebeauty_auth.db`
-- Restore by replacing both files as a pair, then restarting the app.
+- Restore steps:
+  - stop the app
+  - copy the current live pair aside as a rollback snapshot
+  - replace both database files as a matched pair
+  - restart the app
+- Post-restore verification:
+  - confirm `/login` loads
+  - confirm a known admin account can sign in
+  - confirm `/orders` and `/users` render without schema errors
+  - confirm the auth database still contains `admin_users`, `admin_access_events`,
+    and `admin_login_throttles`
+- If restore validation fails, roll back to the pre-restore snapshot and
+  escalate to the technical maintainer before further writes occur.
 - If `DATABASE_URL` or `AUTH_DATABASE_URL` are overridden, back up those custom
   paths instead of the defaults above.
 
@@ -123,12 +169,14 @@ Run the local test suite with one of these commands:
 ```
 
 ```bash
-python -m pytest -q
+APP_RUNTIME=demo-dev python -m pytest -q
 ```
 
 GitHub Actions workflows:
 
 - `.github/workflows/pytest.yml` runs pytest on Python 3.10 and 3.12
+- `.github/workflows/pytest.yml` also runs Playwright-based accessibility smoke
+  coverage for `/login`, `/`, `/orders`, `/tasks`, and `/account/settings`
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce
   new high-severity vulnerable dependencies
@@ -142,8 +190,9 @@ coexist with the Gitleaks workflow or replace it later.
 
 ## Repository Layout
 
-- `shyne.py`: application setup, models, auth flow, routes, admin registration,
-  and CLI commands
+- `shyne.py`: compatibility facade that preserves the public app/module entrypoints
+- `shyne_app/`: internal package containing config, models, auth, access,
+  admin, routes, and CLI modules
 - `templates/`: Jinja templates for the current UI surfaces
 - `static/`: shared frontend assets such as `shyneIcon.png`
 - `tests/`: pytest coverage for auth, CSRF, protected routes, create workflows,

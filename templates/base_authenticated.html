@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}ShyneBeauty{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Raleway:wght@600;700&display=swap">
+  <title>{% block title %}{% if self.page_title() %}{{ self.page_title()|striptags|trim }} | ShyneBeauty{% else %}ShyneBeauty{% endif %}{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='shyneIcon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shyne.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
@@ -36,6 +35,11 @@
           <strong>{{ current_admin_label }}</strong>
           <span>{{ current_admin_role_label }}</span>
         </div>
+        {% if account_settings_available %}
+          <a class="sb-button-secondary" href="{{ url_for('account_settings') }}">
+            Account Settings
+          </a>
+        {% endif %}
         <form method="post" action="{{ url_for('logout') }}">
           {{ csrf_input() }}
           <button class="sb-button-secondary" type="submit">Log out</button>
@@ -69,6 +73,11 @@
     </nav>
 
     <main class="sb-main" id="main-content">
+      {% if runtime_banner_label %}
+        <div class="sb-runtime-banner" role="status" aria-label="{{ runtime_banner_label }}">
+          {{ runtime_banner_label }}
+        </div>
+      {% endif %}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="sb-flash-stack" aria-live="polite">
