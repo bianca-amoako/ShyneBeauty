@@ -1,5 +1,7 @@
+import tempfile
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import Error as PlaywrightError
@@ -15,35 +17,70 @@ from shyne import (
     utc_now,
 )
 
+A11Y_ADMIN_EMAIL = "a11y-admin@shynebeauty.com"
+A11Y_ADMIN_PASSWORD = "ValidPassw0rd!"
+
+
+def configure_test_database_uris(primary_uri, auth_uri):
+    flask_app.config["SQLALCHEMY_DATABASE_URI"] = primary_uri
+    flask_app.config["SQLALCHEMY_BINDS"] = {"auth": auth_uri}
+
+    engines = db._app_engines[flask_app]
+    for engine in engines.values():
+        engine.dispose()
+    engines.clear()
+
+    echo = flask_app.config.get("SQLALCHEMY_ECHO", False)
+    for bind_key, uri in ((None, primary_uri), ("auth", auth_uri)):
+        options = {"url": uri, "echo": echo, "echo_pool": echo}
+        db._make_metadata(bind_key)
+        db._apply_driver_defaults(options, flask_app)
+        engines[bind_key] = db._make_engine(bind_key, options, flask_app)
+
 
 @contextmanager
 def live_server():
-    flask_app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+    original_primary_uri = flask_app.config["SQLALCHEMY_DATABASE_URI"]
+    original_auth_uri = flask_app.config["SQLALCHEMY_BINDS"]["auth"]
+    server = None
+    thread = None
 
-    with flask_app.app_context():
-        db.drop_all(bind_key="__all__")
-        db.create_all(bind_key="__all__")
-        admin_user = AdminUser(
-            email="a11y-admin@shynebeauty.com",
-            full_name="Accessibility Admin",
-        )
-        admin_user.set_password("ValidPassw0rd!")
-        admin_user.set_role(ROLE_SUPERADMIN, now=utc_now())
-        admin_user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=utc_now())
-        db.session.add(admin_user)
-        db.session.commit()
+    with tempfile.TemporaryDirectory(prefix="shynebeauty-a11y-") as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        primary_uri = f"sqlite:///{(tmp_path / 'primary.db').as_posix()}"
+        auth_uri = f"sqlite:///{(tmp_path / 'auth.db').as_posix()}"
 
-    server = make_server("127.0.0.1", 0, flask_app)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        thread.join(timeout=5)
+        flask_app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        configure_test_database_uris(primary_uri, auth_uri)
+
         with flask_app.app_context():
             db.session.remove()
             db.drop_all(bind_key="__all__")
+            db.create_all(bind_key="__all__")
+            admin_user = AdminUser(
+                email=A11Y_ADMIN_EMAIL,
+                full_name="Accessibility Admin",
+            )
+            admin_user.set_password(A11Y_ADMIN_PASSWORD)
+            admin_user.set_role(ROLE_SUPERADMIN, now=utc_now())
+            admin_user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=utc_now())
+            db.session.add(admin_user)
+            db.session.commit()
+
+        server = make_server("127.0.0.1", 0, flask_app)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            if server is not None:
+                server.shutdown()
+            if thread is not None:
+                thread.join(timeout=5)
+            with flask_app.app_context():
+                db.session.remove()
+                db.drop_all(bind_key="__all__")
+            configure_test_database_uris(original_primary_uri, original_auth_uri)
 
 
 def collect_accessibility_findings(page):
@@ -87,6 +124,7 @@ def collect_accessibility_findings(page):
     )
 
 
+@pytest.mark.a11y_smoke
 @pytest.mark.parametrize(
     ("path", "requires_login"),
     [
@@ -103,17 +141,21 @@ def test_accessibility_smoke(path, requires_login):
             try:
                 browser = playwright.chromium.launch()
             except PlaywrightError as exc:
-                if "libasound.so.2" in str(exc):
+                if (
+                    "Executable doesn't exist" in str(exc)
+                    or "Please run the following command to download new browsers" in str(exc)
+                    or "libasound.so.2" in str(exc)
+                ):
                     pytest.skip(
-                        "Playwright Chromium runtime deps are unavailable locally; CI installs them with --with-deps."
+                        "Playwright Chromium is unavailable locally; install browsers or rely on the dedicated CI a11y-smoke job."
                     )
                 raise
             page = browser.new_page()
 
             if requires_login:
                 page.goto(f"{base_url}/login", wait_until="networkidle")
-                page.fill('input[name="email"]', "a11y-admin@shynebeauty.com")
-                page.fill('input[name="password"]', "ValidPassw0rd!")
+                page.fill('input[name="email"]', A11Y_ADMIN_EMAIL)
+                page.fill('input[name="password"]', A11Y_ADMIN_PASSWORD)
                 page.click('button[type="submit"]')
                 page.wait_for_load_state("networkidle")
 
