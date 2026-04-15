@@ -7,6 +7,10 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 
 from shyne import (
+    APP_RUNTIME_CHOICES,
+    APP_RUNTIME_DEMO_DEV,
+    APP_RUNTIME_LIVE_PROD,
+    AUTH_BIND_KEY,
     ACCOUNT_STATUS_ACTIVE,
     AdminUser,
     Batch,
@@ -26,8 +30,15 @@ from shyne import (
     ROLE_STAFF_OPERATOR,
     ROLE_SUPERADMIN,
     Shipment,
+    default_runtime_for_process,
     db,
+    init_db_targets_live_data,
+    instance_database_uris,
     load_project_env,
+    load_user,
+    runtime_init_command_hint,
+    runtime_default_flag,
+    resolve_runtime_database_config,
 )
 
 
@@ -82,6 +93,107 @@ def test_load_project_env_does_not_override_existing_environment(monkeypatch, tm
     assert os.environ["SECRET_KEY"] == "shell-secret"
 
 
+def test_default_runtime_for_process_uses_demo_defaults():
+    assert default_runtime_for_process(invoked_as_main=True) == APP_RUNTIME_DEMO_DEV
+    assert default_runtime_for_process(invoked_as_main=False) == APP_RUNTIME_DEMO_DEV
+
+
+def test_runtime_default_flag_switches_between_demo_and_live_defaults():
+    assert runtime_default_flag(APP_RUNTIME_DEMO_DEV, demo_default=False, live_default=True) is False
+    assert runtime_default_flag(APP_RUNTIME_LIVE_PROD, demo_default=False, live_default=True) is True
+
+
+def test_instance_database_uris_returns_demo_and_live_defaults(tmp_path):
+    uris = instance_database_uris(tmp_path)
+
+    assert set(uris) == {APP_RUNTIME_DEMO_DEV, APP_RUNTIME_LIVE_PROD}
+    assert "shynebeauty_demo.db" in uris[APP_RUNTIME_DEMO_DEV]["primary"]
+    assert "shynebeauty_demo_auth.db" in uris[APP_RUNTIME_DEMO_DEV]["auth"]
+    assert "shynebeauty_live.db" in uris[APP_RUNTIME_LIVE_PROD]["primary"]
+    assert "shynebeauty_live_auth.db" in uris[APP_RUNTIME_LIVE_PROD]["auth"]
+
+
+def test_resolve_runtime_database_config_uses_demo_defaults_when_runtime_unset(tmp_path):
+    config = resolve_runtime_database_config(base_dir=tmp_path, environ={})
+
+    assert config["runtime"] == APP_RUNTIME_DEMO_DEV
+    assert "shynebeauty_demo.db" in config["primary_uri"]
+    assert "shynebeauty_demo_auth.db" in config["auth_uri"]
+    assert config["database_override"] is False
+    assert config["auth_database_override"] is False
+
+
+def test_resolve_runtime_database_config_uses_live_defaults_when_runtime_is_live(tmp_path):
+    config = resolve_runtime_database_config(
+        base_dir=tmp_path,
+        environ={"APP_RUNTIME": APP_RUNTIME_LIVE_PROD},
+    )
+
+    assert config["runtime"] == APP_RUNTIME_LIVE_PROD
+    assert "shynebeauty_live.db" in config["primary_uri"]
+    assert "shynebeauty_live_auth.db" in config["auth_uri"]
+
+
+def test_resolve_runtime_database_config_prefers_explicit_database_overrides(tmp_path):
+    config = resolve_runtime_database_config(
+        base_dir=tmp_path,
+        environ={
+            "APP_RUNTIME": APP_RUNTIME_LIVE_PROD,
+            "DATABASE_URL": "sqlite:////tmp/custom-primary.db",
+            "AUTH_DATABASE_URL": "sqlite:////tmp/custom-auth.db",
+        },
+    )
+
+    assert config["runtime"] == APP_RUNTIME_LIVE_PROD
+    assert config["primary_uri"] == "sqlite:////tmp/custom-primary.db"
+    assert config["auth_uri"] == "sqlite:////tmp/custom-auth.db"
+    assert config["database_override"] is True
+    assert config["auth_database_override"] is True
+
+
+def test_resolve_runtime_database_config_rejects_invalid_runtime(tmp_path):
+    try:
+        resolve_runtime_database_config(
+            base_dir=tmp_path,
+            environ={"APP_RUNTIME": "staging"},
+        )
+    except RuntimeError as exc:
+        assert "APP_RUNTIME must be one of" in str(exc)
+        for runtime in APP_RUNTIME_CHOICES:
+            assert runtime in str(exc)
+    else:
+        raise AssertionError("Expected invalid APP_RUNTIME to raise RuntimeError")
+
+
+def test_readme_documents_demo_runtime_for_local_dev():
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "APP_RUNTIME = \"demo-dev\"" in readme or "APP_RUNTIME=demo-dev" in readme
+    assert "python shyne.py" in readme
+    assert "Unset runtime means demo" in readme
+
+
+def test_readme_documents_gunicorn_as_linux_production_default():
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "APP_RUNTIME=live-prod gunicorn --bind 127.0.0.1:8000 shyne:app" in readme
+    assert "Live requires explicit `APP_RUNTIME=live-prod`" in readme
+
+
+def test_app_runtime_sensitive_defaults_are_applied():
+    from shyne import app
+
+    assert app.config["APP_RUNTIME"] in {APP_RUNTIME_DEMO_DEV, APP_RUNTIME_LIVE_PROD}
+    if app.config["APP_RUNTIME"] == APP_RUNTIME_DEMO_DEV:
+        assert app.config["SESSION_COOKIE_SECURE"] is False
+        assert app.config["ENABLE_DEV_TEST_ADMIN"] is False
+        assert app.config["TRUST_PROXY_HEADERS"] is False
+    else:
+        assert app.config["SESSION_COOKIE_SECURE"] is True
+        assert app.config["ENABLE_DEV_TEST_ADMIN"] is False
+        assert app.config["TRUST_PROXY_HEADERS"] is False
+
+
 def test_login_route_renders_expected_content(client):
     response = client.get("/login")
 
@@ -89,10 +201,26 @@ def test_login_route_renders_expected_content(client):
     assert response.content_type.startswith("text/html")
     assert b"Sign in to ShyneBeauty" in response.data
     assert b"Admin dashboard access" in response.data
-    assert b"Forgot password?" in response.data
     assert b"trusted internal admin workflow" in response.data
     assert b"Local development shortcut" not in response.data
     assert b"seed-dev-admin" not in response.data
+
+
+def test_login_shows_setup_error_when_auth_schema_is_missing(app, client):
+    with app.app_context():
+        AdminUser.__table__.drop(bind=db.engines["auth"], checkfirst=True)
+
+    response = client.post(
+        "/login",
+        data={
+            "email": "olivia.mercer@shynebeauty.com",
+            "password": "ShyneDemoSuper1!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert b"The authentication database is not initialized yet." in response.data
+    assert runtime_init_command_hint().encode("utf-8") in response.data
 
 
 def test_index_route_links_to_orders_page(client, admin_user, login):
@@ -104,6 +232,7 @@ def test_index_route_links_to_orders_page(client, admin_user, login):
     assert b'href="/orders"' in response.data
     assert b'href="/customers"' in response.data
     assert b"Manage Orders" in response.data
+    assert b"Demo environment" in response.data
 
 
 def test_orders_route_links_back_to_dashboard(client, admin_user, login):
@@ -138,18 +267,139 @@ def test_routes_are_registered(app):
     assert "/add-product" in routes
     assert "/users" in routes
     assert "/change-password" in routes
+    assert "/account/settings" in routes
     assert "/tasks" in routes
     assert "/logout" in routes
 
 
-def test_tasks_route_discloses_prototype_status(client, admin_user, login):
+def test_load_user_returns_none_when_auth_table_is_unavailable(app):
+    with app.app_context():
+        auth_engine = db.engines["auth"]
+        AdminUser.__table__.drop(bind=auth_engine, checkfirst=True)
+
+        assert load_user("1") is None
+
+
+def test_tasks_route_renders_live_operational_sections(client, admin_user, login):
     login(client)
 
     response = client.get("/tasks")
 
     assert response.status_code == 200
-    assert b"This page is still a prototype." in response.data
-    assert b"Prototype only" in response.data
+    assert b"Order Intake Review" in response.data
+    assert b"Shipping Handoff" in response.data
+    assert b"Inventory Attention" in response.data
+    assert b"Orders awaiting intake review" in response.data
+    assert b"Orders ready for shipping handoff" in response.data
+    assert b"Inventory items needing attention" in response.data
+
+
+def test_tasks_route_surfaces_live_and_empty_operational_states(
+    client, admin_user, app, login
+):
+    login(client)
+
+    empty_response = client.get("/tasks")
+
+    assert empty_response.status_code == 200
+    assert b"No orders are currently waiting for intake review." in empty_response.data
+    assert b"No orders are currently ready for shipping handoff." in empty_response.data
+    assert b"No inventory items currently need attention." in empty_response.data
+
+    with app.app_context():
+        customer = Customer(
+            first_name="Taylor",
+            last_name="Customer",
+            email="taylor.tasks@shynebeauty.com",
+            country="USA",
+        )
+        placed_product = Product(
+            name="Glow Balm",
+            sku="GB-TASKS-001",
+            price=Decimal("24.50"),
+            active=True,
+            reorder_threshold=5,
+        )
+        ready_product = Product(
+            name="Body Butter",
+            sku="BB-TASKS-001",
+            price=Decimal("18.00"),
+            active=True,
+            reorder_threshold=4,
+        )
+        low_stock_item = Ingredient(
+            name="Shea Butter Tasks",
+            stock_quantity=Decimal("3.000"),
+            reorder_threshold=Decimal("5.000"),
+            unit="lb",
+            supplier_name="Butter Supply Co.",
+        )
+        out_of_stock_item = Ingredient(
+            name="Fragrance Oil Tasks",
+            stock_quantity=Decimal("0.000"),
+            reorder_threshold=Decimal("2.000"),
+            unit="oz",
+            supplier_name="Aroma House",
+        )
+        db.session.add_all(
+            [customer, placed_product, ready_product, low_stock_item, out_of_stock_item]
+        )
+        db.session.flush()
+
+        placed_order = Order(
+            customer_id=customer.id,
+            order_number="ORD-TASKS-PLACED",
+            platform="Direct",
+            total_amount=Decimal("24.50"),
+            status="Placed",
+            placed_at=datetime(2026, 4, 14, tzinfo=timezone.utc),
+        )
+        ready_order = Order(
+            customer_id=customer.id,
+            order_number="ORD-TASKS-READY",
+            platform="Square",
+            total_amount=Decimal("18.00"),
+            status="Ready",
+            placed_at=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        )
+        db.session.add_all([placed_order, ready_order])
+        db.session.flush()
+
+        db.session.add_all(
+            [
+                OrderItem(
+                    order_id=placed_order.id,
+                    product_id=placed_product.id,
+                    quantity=1,
+                    unit_price=Decimal("24.50"),
+                ),
+                OrderItem(
+                    order_id=ready_order.id,
+                    product_id=ready_product.id,
+                    quantity=1,
+                    unit_price=Decimal("18.00"),
+                ),
+                Shipment(
+                    order_id=ready_order.id,
+                    carrier="USPS",
+                    tracking_number="9400111206210582999999",
+                ),
+            ]
+        )
+        db.session.commit()
+
+    response = client.get("/tasks")
+
+    assert response.status_code == 200
+    assert b"ORD-TASKS-PLACED" in response.data
+    assert b"ORD-TASKS-READY" in response.data
+    assert b"Glow Balm" in response.data
+    assert b"Body Butter" in response.data
+    assert b"USPS: 9400111206210582999999" in response.data
+    assert b"Fragrance Oil Tasks" in response.data
+    assert b"Shea Butter Tasks" in response.data
+    assert b"Out of stock" in response.data
+    assert b"Low stock" in response.data
 
 
 def test_init_db_cli_command_creates_tables_and_reports_success(app):
@@ -287,6 +537,40 @@ def test_init_live_db_cli_command_creates_schema_without_demo_data(app):
         assert Customer.query.count() == 0
         inspector = inspect(db.engines["auth"])
         assert "admin_users" in inspector.get_table_names()
+        assert "admin_login_throttles" in inspector.get_table_names()
+
+
+def test_init_db_cli_command_refuses_live_runtime_targets(app):
+    runner = app.test_cli_runner()
+    live_defaults = app.config["RUNTIME_DEFAULT_DATABASES"][APP_RUNTIME_LIVE_PROD]
+    app.config["APP_RUNTIME"] = APP_RUNTIME_LIVE_PROD
+    app.config["SQLALCHEMY_DATABASE_URI"] = live_defaults["primary"]
+    app.config["SQLALCHEMY_BINDS"][AUTH_BIND_KEY] = live_defaults["auth"]
+
+    result = runner.invoke(args=["init-db"])
+
+    assert result.exit_code != 0
+    assert "init-db only supports demo-dev targets" in result.output
+
+
+def test_init_db_targets_live_data_detects_live_runtime_or_live_defaults(app):
+    original_runtime = app.config["APP_RUNTIME"]
+    original_primary = app.config["SQLALCHEMY_DATABASE_URI"]
+    original_auth = app.config["SQLALCHEMY_BINDS"][AUTH_BIND_KEY]
+    live_defaults = app.config["RUNTIME_DEFAULT_DATABASES"][APP_RUNTIME_LIVE_PROD]
+
+    try:
+        app.config["APP_RUNTIME"] = APP_RUNTIME_LIVE_PROD
+        assert init_db_targets_live_data() is True
+
+        app.config["APP_RUNTIME"] = APP_RUNTIME_DEMO_DEV
+        app.config["SQLALCHEMY_DATABASE_URI"] = live_defaults["primary"]
+        app.config["SQLALCHEMY_BINDS"][AUTH_BIND_KEY] = live_defaults["auth"]
+        assert init_db_targets_live_data() is True
+    finally:
+        app.config["APP_RUNTIME"] = original_runtime
+        app.config["SQLALCHEMY_DATABASE_URI"] = original_primary
+        app.config["SQLALCHEMY_BINDS"][AUTH_BIND_KEY] = original_auth
 
 
 def test_init_db_cli_command_adds_customer_source_column_to_existing_table(app):
@@ -353,7 +637,7 @@ def test_create_admin_cli_command_allows_admin_identifier_now(app):
 
     result = runner.invoke(
         args=["create-admin", "--email", "admin"],
-        input="AdminPassw0rd!\nAdminPassw0rd!\n",
+        input="RootPassw0rd!\nRootPassw0rd!\n",
     )
 
     assert result.exit_code == 0
@@ -362,7 +646,19 @@ def test_create_admin_cli_command_allows_admin_identifier_now(app):
     with app.app_context():
         user = AdminUser.query.filter_by(email="admin").one()
         assert user.get_role() == ROLE_SUPERADMIN
-        assert user.check_password("AdminPassw0rd!") is True
+        assert user.check_password("RootPassw0rd!") is True
+
+
+def test_create_admin_cli_command_rejects_password_containing_email(app):
+    runner = app.test_cli_runner()
+
+    result = runner.invoke(
+        args=["create-admin", "--email", "owner@shynebeauty.com"],
+        input="OwnerSecure123!\nOwnerSecure123!\n",
+    )
+
+    assert result.exit_code != 0
+    assert "cannot contain your email address" in result.output
 
 
 def test_create_dev_admin_cli_command_creates_hidden_dev_admin(app):

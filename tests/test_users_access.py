@@ -79,6 +79,12 @@ def test_create_user_with_manual_temporary_password(
     assert login_response.status_code == 302
     assert "/change-password" in login_response.headers["Location"]
 
+    first_login_page = client.get("/change-password")
+
+    assert first_login_page.status_code == 200
+    assert b"Enable MFA for this account now" in first_login_page.data
+    assert b"optional" in first_login_page.data.lower()
+
 
 def test_create_user_with_generated_temporary_password_shows_password_once(
     client, admin_user, app, login
@@ -103,6 +109,29 @@ def test_create_user_with_generated_temporary_password_shows_password_once(
         created_user = AdminUser.query.filter_by(email="jordan@shynebeauty.com").one()
         assert created_user.get_account_status() == ACCOUNT_STATUS_ACTIVE
         assert created_user.requires_password_change() is True
+
+
+def test_create_user_rejects_weak_manual_temporary_password(client, admin_user, app, login):
+    login(client)
+
+    response = client.post(
+        "/users/invite",
+        data={
+            "full_name": "Weak Temp",
+            "email": "weak@shynebeauty.com",
+            "role": ROLE_STAFF_OPERATOR,
+            "password_mode": "manual",
+            "password": "weak-pass1!",
+            "password_confirmation": "weak-pass1!",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Password must be at least 12 characters." in response.data
+
+    with app.app_context():
+        assert AdminUser.query.filter_by(email="weak@shynebeauty.com").first() is None
 
 
 def test_users_invite_rejects_missing_csrf_token(
@@ -208,6 +237,58 @@ def test_superadmin_can_set_temporary_password_for_active_business_user(
         user = db.session.get(AdminUser, staff_user)
         assert user.check_password("NewTempPassw0rd!") is True
         assert user.requires_password_change() is True
+
+
+def test_temporary_password_reset_routes_back_to_optional_first_login_flow(
+    client, admin_user, app, login
+):
+    login(client)
+
+    create_response = client.post(
+        "/users/invite",
+        data={
+            "full_name": "Resettable Super",
+            "email": "resettable-super@shynebeauty.com",
+            "role": ROLE_SUPERADMIN,
+            "password_mode": "manual",
+            "password": "TempResetPass12",
+            "password_confirmation": "TempResetPass12",
+        },
+    )
+
+    assert create_response.status_code == 302
+
+    with app.app_context():
+        created_user = AdminUser.query.filter_by(
+            email="resettable-super@shynebeauty.com"
+        ).one()
+        created_user_id = created_user.id
+
+    reset_response = client.post(
+        f"/users/{created_user_id}/temporary-password",
+        data={
+            "password": "AnotherTempPass12",
+            "password_confirmation": "AnotherTempPass12",
+        },
+    )
+
+    assert reset_response.status_code == 302
+
+    client.post("/logout")
+    login_response = login(
+        client,
+        email="resettable-super@shynebeauty.com",
+        password="AnotherTempPass12",
+    )
+
+    assert login_response.status_code == 302
+    assert "/change-password" in login_response.headers["Location"]
+
+    first_login_page = client.get("/change-password")
+
+    assert first_login_page.status_code == 200
+    assert b"Enable MFA for this account now" in first_login_page.data
+    assert b"Manual Setup Key" in first_login_page.data
 
 
 def test_legacy_pending_invite_can_still_be_activated_with_temporary_password(
