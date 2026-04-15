@@ -47,7 +47,8 @@
   --sb-accent-warm-soft: #e8d5bb;
 
   /* — Typography — */
-  --sb-font-body: "DM Sans", "Raleway", sans-serif;
+  --sb-font-body: "DM Sans", sans-serif;
+  --sb-font-heading: "Raleway", "DM Sans", sans-serif;
   --sb-letter-spacing-tight: -0.02em;
 
   /* — Transitions — */
@@ -375,6 +376,21 @@ button {
   padding: 22px 24px 40px;
 }
 
+.sb-runtime-banner {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--sb-border-strong);
+  border-radius: 999px;
+  background: var(--sb-warn-bg);
+  color: var(--sb-warn-text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .sb-page-header {
   display: flex;
   align-items: flex-start;
@@ -389,6 +405,7 @@ button {
   line-height: 1.1;
   letter-spacing: var(--sb-letter-spacing-tight);
   color: var(--sb-heading);
+  font-family: var(--sb-font-heading);
 }
 
 .sb-page-header p {
@@ -481,6 +498,7 @@ button {
   font-size: 16px;
   letter-spacing: -0.01em;
   color: var(--sb-heading);
+  font-family: var(--sb-font-heading);
 }
 
 /* =============================================
@@ -1069,12 +1087,31 @@ button {
   font-weight: 700;
   color: #5f564f;
   letter-spacing: 0.4px;
+  font-family: var(--sb-font-heading);
 }
 
 .sb-login-panel h1 {
   margin: 0;
   font-size: 34px;
   color: #5f564f;
+  font-family: var(--sb-font-heading);
+}
+
+.sb-mfa-qr {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: var(--sb-radius-sm);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--sb-border);
+  box-shadow: var(--sb-shadow);
+}
+
+.sb-mfa-qr svg {
+  display: block;
+  width: 180px;
+  height: 180px;
 }
 
 .sb-subtle {
