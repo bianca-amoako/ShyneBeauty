@@ -53,11 +53,11 @@ from .auth import *
 
 
 def _request_client_ip():
-    return (
-        request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or request.remote_addr
-        or "unknown"
-    )
+    if app.config.get("TRUST_PROXY_HEADERS"):
+        forwarded = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    return request.remote_addr or "unknown"
 
 
 def _login_setup_error_response():
