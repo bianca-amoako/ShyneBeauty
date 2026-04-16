@@ -37,7 +37,13 @@ def _configure_logging(runtime: str, log_dir) -> None:
 
 # Config docs and local setup store dotenv files at project root
 load_project_env(BASE_DIR.parent)
-app.config["SECRET_KEY"] = require_env("SECRET_KEY")
+_secret_key = require_env("SECRET_KEY")
+if not _secret_key or not _secret_key.strip():
+    raise RuntimeError(
+        "SECRET_KEY environment variable is missing or empty. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+app.config["SECRET_KEY"] = _secret_key
 runtime_database_config = resolve_runtime_database_config(BASE_DIR.parent)
 app.config["APP_RUNTIME"] = runtime_database_config["runtime"]
 app.config["RUNTIME_DEFAULT_DATABASES"] = runtime_database_config["runtime_defaults"]
