@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import secrets
@@ -12,6 +13,8 @@ from decimal import Decimal
 import click
 from dotenv import dotenv_values
 import pyotp
+import qrcode
+import qrcode.image.svg
 from flask import (
     Flask,
     flash,
@@ -84,12 +87,12 @@ def _mfa_provisioning_context(admin_user, *, session_key="mfa_enrollment_secret"
         name=admin_user.email,
         issuer_name="ShyneBeauty",
     )
-    qr_svg_markup = (
-        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180' role='img' "
-        "aria-label='Authenticator QR placeholder'><rect width='180' height='180' fill='white'/>"
-        "<rect x='12' y='12' width='156' height='156' fill='none' stroke='black' stroke-width='6'/>"
-        "<text x='90' y='95' text-anchor='middle' font-size='14' fill='black'>Scan in app</text></svg>"
-    )
+    qr = qrcode.make(provisioning_uri, image_factory=qrcode.image.svg.SvgPathImage)
+    buf = io.BytesIO()
+    qr.save(buf)
+    raw_svg = buf.getvalue().decode("utf-8")
+    # Strip XML declaration so the SVG can be safely inlined in HTML
+    qr_svg_markup = raw_svg.split("?>", 1)[-1].strip() if "?>" in raw_svg else raw_svg
     return {
         "manual_secret": secret,
         "provisioning_uri": provisioning_uri,
