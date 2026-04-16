@@ -76,8 +76,9 @@ def handle_429(error):
     referrer = request.referrer
     if referrer:
         parsed = urlparse(referrer)
-        if parsed.netloc == request.host:
-            return redirect(referrer), 429
+        if parsed.netloc == request.host and parsed.path:
+            safe_url = url_for("login") if parsed.path == "/" else parsed.path
+            return redirect(safe_url), 429
     return redirect(url_for("login")), 429
 
 
@@ -246,7 +247,12 @@ def enforce_https():
         return None
     proto = request.headers.get("X-Forwarded-Proto", "https")
     if proto == "http":
-        return redirect(request.url.replace("http://", "https://", 1), code=301)
+        https_url = request.url
+        if https_url.startswith("http://"):
+            https_url = "https://" + https_url[7:]
+        parsed = urlparse(https_url)
+        if parsed.scheme == "https" and parsed.netloc == request.host:
+            return redirect(parsed.geturl(), code=301)
     return None
 
 
