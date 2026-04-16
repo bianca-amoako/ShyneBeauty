@@ -48,6 +48,19 @@
     </form>
   </section>
 
+  {% if show_mfa_warning %}
+  <div
+    class="sb-note-box"
+    style="max-width: 720px; border-left-color: #c8a060;"
+    role="alert"
+    aria-live="polite"
+  >
+    <strong>MFA is strongly recommended for this account.</strong>
+    This account has elevated permissions. Enable multi-factor authentication
+    below to protect it against unauthorised access.
+  </div>
+  {% endif %}
+
   <section class="sb-panel" style="max-width: 720px;">
     <h2>Multi-Factor Authentication</h2>
     <p class="sb-section-note">
