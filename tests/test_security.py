@@ -392,8 +392,8 @@ def test_seeded_superadmin_can_log_in_after_init_db(client, app):
     response = client.post(
         "/login",
         data={
-            "email": "olivia.mercer@shynebeauty.com",
-            "password": "ShyneDemoSuper1!",
+            "email": "superadmin@demo.com",
+            "password": "demo",
             "next": "/users",
         },
     )
@@ -402,7 +402,7 @@ def test_seeded_superadmin_can_log_in_after_init_db(client, app):
     assert response.headers["Location"].endswith("/users")
 
     with app.app_context():
-        user = AdminUser.query.filter_by(email="olivia.mercer@shynebeauty.com").one()
+        user = AdminUser.query.filter_by(email="superadmin@demo.com").one()
         user_id = user.id
         assert user.last_login_at is not None
 
@@ -423,8 +423,8 @@ def test_seeded_dev_admin_can_access_admin_console_after_init_db(client, app):
     response = client.post(
         "/login",
         data={
-            "email": "devops@shynebeauty.com",
-            "password": "ShyneDemoDev1!",
+            "email": "devadmin@demo.com",
+            "password": "demo",
             "next": "/admin/",
         },
     )
@@ -446,8 +446,8 @@ def test_business_role_seeded_by_init_db_cannot_access_admin_console(client, app
     login_response = client.post(
         "/login",
         data={
-            "email": "maya.brooks@shynebeauty.com",
-            "password": "ShyneDemoStaff1!",
+            "email": "staffoperator@demo.com",
+            "password": "demo",
         },
     )
     assert login_response.status_code == 302
@@ -467,7 +467,7 @@ def test_seeded_demo_user_still_locks_after_repeated_failed_attempts(client, app
         response = client.post(
             "/login",
             data={
-                "email": "devops@shynebeauty.com",
+                "email": "devadmin@demo.com",
                 "password": "wrong-password",
             },
         )
@@ -475,15 +475,15 @@ def test_seeded_demo_user_still_locks_after_repeated_failed_attempts(client, app
         assert b"Invalid email or password." in response.data
 
     with app.app_context():
-        user = AdminUser.query.filter_by(email="devops@shynebeauty.com").one()
+        user = AdminUser.query.filter_by(email="devadmin@demo.com").one()
         assert user.failed_login_count == 5
         assert user.locked_until is not None
 
     locked_response = client.post(
         "/login",
         data={
-            "email": "devops@shynebeauty.com",
-            "password": "ShyneDemoDev1!",
+            "email": "devadmin@demo.com",
+            "password": "demo",
         },
     )
 

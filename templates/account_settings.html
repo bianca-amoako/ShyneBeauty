@@ -7,89 +7,59 @@
 {% endblock %}
 
 {% block content %}
-  <section class="sb-panel" style="max-width: 720px;">
-    <h2>Change Password</h2>
-    <p class="sb-section-note">Use your current password to confirm this change. If MFA is enabled, enter a current authenticator code too.</p>
-    <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}">
-      {{ csrf_input() }}
-      <input type="hidden" name="action" value="change_password">
-      <div class="sb-field sb-field-float">
-        <input class="sb-input" id="current-password" name="current_password" type="password" autocomplete="current-password" placeholder=" " required>
-        <label for="current-password">Current Password</label>
-      </div>
-      <div class="sb-field sb-field-float">
-        <input class="sb-input" id="new-password" name="new_password" type="password" autocomplete="new-password" placeholder=" " required>
-        <label for="new-password">New Password</label>
-      </div>
-      <div class="sb-field sb-field-float">
-        <input class="sb-input" id="confirm-new-password" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" " required>
-        <label for="confirm-new-password">Confirm New Password</label>
-      </div>
-      {% if mfa_enabled %}
-        <div class="sb-field sb-field-float">
-          <input
-            class="sb-input"
-            id="password-mfa-code"
-            name="password_mfa_code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxlength="6"
-            placeholder=" "
-            required
-          >
-          <label for="password-mfa-code">Authentication Code</label>
-        </div>
-      {% endif %}
-      <div class="sb-form-actions">
-        <button class="sb-button" type="submit">Update Password</button>
-      </div>
-    </form>
-  </section>
+  <div class="sb-tabs">
+    <div class="sb-tab-list" role="tablist" aria-label="Account settings sections">
+      <button
+        class="sb-tab-btn"
+        role="tab"
+        id="tab-password"
+        aria-selected="true"
+        aria-controls="panel-password"
+        data-tab="panel-password"
+        onclick="switchTab('panel-password')"
+      >Change Password</button>
+      <button
+        class="sb-tab-btn"
+        role="tab"
+        id="tab-mfa"
+        aria-selected="false"
+        aria-controls="panel-mfa"
+        data-tab="panel-mfa"
+        onclick="switchTab('panel-mfa')"
+      >Multi-Factor Authentication</button>
+    </div>
 
-  {% if show_mfa_warning %}
-  <div
-    class="sb-note-box"
-    style="max-width: 720px; border-left-color: #c8a060;"
-    role="alert"
-    aria-live="polite"
-  >
-    <strong>MFA is strongly recommended for this account.</strong>
-    This account has elevated permissions. Enable multi-factor authentication
-    below to protect it against unauthorised access.
-  </div>
-  {% endif %}
-
-  <section class="sb-panel" style="max-width: 720px;">
-    <h2>Multi-Factor Authentication</h2>
-    <p class="sb-section-note">
-      {% if mfa_enabled %}
-        MFA is currently enabled for this account and is required during sign-in.
-      {% else %}
-        MFA is currently disabled for this account. Enable it to require an authenticator code at sign-in.
-      {% endif %}
-    </p>
-
-    {% if not mfa_enabled %}
-      <div class="sb-grid sb-grid-2">
-        <div>
-          <h3>Authenticator QR Code</h3>
-          <div class="sb-mfa-qr" aria-hidden="true">
-            {{ qr_svg_markup|safe }}
+    <div
+      id="panel-password"
+      class="sb-tab-panel"
+      role="tabpanel"
+      aria-labelledby="tab-password"
+      data-active="true"
+    >
+      <section class="sb-panel">
+        <h2>Change Password</h2>
+        <p class="sb-section-note">Use your current password to confirm this change. If MFA is enabled, enter a current authenticator code too.</p>
+        <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}" style="max-width: 480px;">
+          {{ csrf_input() }}
+          <input type="hidden" name="action" value="change_password">
+          <div class="sb-field sb-field-float">
+            <input class="sb-input" id="current-password" name="current_password" type="password" autocomplete="current-password" placeholder=" " required>
+            <label for="current-password">Current Password</label>
           </div>
-        </div>
-        <div>
-          <h3>Manual Setup Key</h3>
-          <p class="sb-note-box"><strong translate="no">{{ manual_secret }}</strong></p>
-          <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}">
-            {{ csrf_input() }}
-            <input type="hidden" name="action" value="enable_mfa">
+          <div class="sb-field sb-field-float">
+            <input class="sb-input" id="new-password" name="new_password" type="password" autocomplete="new-password" placeholder=" " required>
+            <label for="new-password">New Password</label>
+          </div>
+          <div class="sb-field sb-field-float">
+            <input class="sb-input" id="confirm-new-password" name="password_confirmation" type="password" autocomplete="new-password" placeholder=" " required>
+            <label for="confirm-new-password">Confirm New Password</label>
+          </div>
+          {% if mfa_enabled %}
             <div class="sb-field sb-field-float">
               <input
                 class="sb-input"
-                id="enable-mfa-code"
-                name="mfa_code"
+                id="password-mfa-code"
+                name="password_mfa_code"
                 type="text"
                 inputmode="numeric"
                 autocomplete="one-time-code"
@@ -98,38 +68,150 @@
                 placeholder=" "
                 required
               >
-              <label for="enable-mfa-code">Authentication Code</label>
+              <label for="password-mfa-code">Authentication Code</label>
+            </div>
+          {% endif %}
+          <div class="sb-form-actions">
+            <button class="sb-button" type="submit">Update Password</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div
+      id="panel-mfa"
+      class="sb-tab-panel"
+      role="tabpanel"
+      aria-labelledby="tab-mfa"
+      data-active="false"
+    >
+      {% if show_mfa_warning %}
+      <div
+        class="sb-note-box"
+        style="border-left-color: #c8a060; margin-bottom: 18px;"
+        role="alert"
+        aria-live="polite"
+      >
+        <strong>MFA is strongly recommended for this account.</strong>
+        This account has elevated permissions. Enable multi-factor authentication
+        below to protect it against unauthorised access.
+      </div>
+      {% endif %}
+
+      <section class="sb-panel">
+        <h2>Multi-Factor Authentication</h2>
+        <p class="sb-section-note">
+          {% if mfa_enabled %}
+            MFA is currently enabled for this account and is required during sign-in.
+          {% else %}
+            MFA is currently disabled for this account. Enable it to require an authenticator code at sign-in.
+          {% endif %}
+        </p>
+
+        {% if not mfa_enabled %}
+          <div class="sb-grid sb-grid-2">
+            <div>
+              <h3>Authenticator QR Code</h3>
+              <div class="sb-mfa-qr" aria-hidden="true">
+                {{ qr_svg_markup|safe }}
+              </div>
+            </div>
+            <div>
+              <h3>Manual Setup Key</h3>
+              <div class="sb-copy-row">
+                <p class="sb-note-box">
+                  <span class="sb-mfa-secret" id="mfa-secret-text" translate="no">{{ manual_secret }}</span>
+                </p>
+                <button
+                  type="button"
+                  class="sb-copy-btn"
+                  id="copy-secret-btn"
+                  onclick="copyMfaSecret()"
+                  aria-label="Copy setup key to clipboard"
+                >&#9112; Copy</button>
+              </div>
+              <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}" style="margin-top: 16px;">
+                {{ csrf_input() }}
+                <input type="hidden" name="action" value="enable_mfa">
+                <div class="sb-field sb-field-float">
+                  <input
+                    class="sb-input"
+                    id="enable-mfa-code"
+                    name="mfa_code"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxlength="6"
+                    placeholder=" "
+                    required
+                  >
+                  <label for="enable-mfa-code">Authentication Code</label>
+                </div>
+                <div class="sb-form-actions">
+                  <button class="sb-button" type="submit">Enable MFA</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <p class="sb-note-box"><strong>Status:</strong> Enabled</p>
+          <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}" style="max-width: 420px; margin-top: 16px;">
+            {{ csrf_input() }}
+            <input type="hidden" name="action" value="disable_mfa">
+            <div class="sb-field sb-field-float">
+              <input
+                class="sb-input"
+                id="disable-mfa-code"
+                name="disable_mfa_code"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder=" "
+                required
+              >
+              <label for="disable-mfa-code">Authentication Code</label>
             </div>
             <div class="sb-form-actions">
-              <button class="sb-button" type="submit">Enable MFA</button>
+              <button class="sb-button-danger" type="submit">Disable MFA</button>
             </div>
           </form>
-        </div>
-      </div>
-    {% else %}
-      <p class="sb-note-box"><strong>Status:</strong> Enabled</p>
-      <form class="sb-form-grid" method="post" action="{{ url_for('account_settings') }}" style="max-width: 420px;">
-        {{ csrf_input() }}
-        <input type="hidden" name="action" value="disable_mfa">
-        <div class="sb-field sb-field-float">
-          <input
-            class="sb-input"
-            id="disable-mfa-code"
-            name="disable_mfa_code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxlength="6"
-            placeholder=" "
-            required
-          >
-          <label for="disable-mfa-code">Authentication Code</label>
-        </div>
-        <div class="sb-form-actions">
-          <button class="sb-button-danger" type="submit">Disable MFA</button>
-        </div>
-      </form>
-    {% endif %}
-  </section>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.sb-tab-btn').forEach(function(btn) {
+        btn.setAttribute('aria-selected', btn.dataset.tab === tabId ? 'true' : 'false');
+      });
+      document.querySelectorAll('.sb-tab-panel').forEach(function(panel) {
+        panel.dataset.active = panel.id === tabId ? 'true' : 'false';
+      });
+    }
+
+    function copyMfaSecret() {
+      var text = document.getElementById('mfa-secret-text').textContent.trim();
+      var btn = document.getElementById('copy-secret-btn');
+      navigator.clipboard.writeText(text).then(function() {
+        btn.dataset.copied = 'true';
+        btn.textContent = '\u2713 Copied';
+        setTimeout(function() {
+          btn.dataset.copied = 'false';
+          btn.innerHTML = '&#9112; Copy';
+        }, 2000);
+      });
+    }
+
+    // Auto-switch to MFA tab if URL contains ?tab=mfa or #mfa
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'mfa' || window.location.hash === '#mfa') {
+        switchTab('panel-mfa');
+      }
+    })();
+  </script>
 {% endblock %}

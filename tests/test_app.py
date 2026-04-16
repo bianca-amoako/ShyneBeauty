@@ -448,22 +448,20 @@ def test_init_db_cli_command_creates_tables_and_reports_success(app):
             user.email: user for user in AdminUser.query.order_by(AdminUser.email).all()
         }
         assert set(seeded_users) == {
-            "devops@shynebeauty.com",
-            "maya.brooks@shynebeauty.com",
-            "noah.kim@shynebeauty.com",
-            "olivia.mercer@shynebeauty.com",
+            "devadmin@demo.com",
+            "inventoryproduction@demo.com",
+            "staffoperator@demo.com",
+            "superadmin@demo.com",
         }
-        assert seeded_users["olivia.mercer@shynebeauty.com"].get_role() == ROLE_SUPERADMIN
-        assert seeded_users["maya.brooks@shynebeauty.com"].get_role() == ROLE_STAFF_OPERATOR
+        assert seeded_users["superadmin@demo.com"].get_role() == ROLE_SUPERADMIN
+        assert seeded_users["staffoperator@demo.com"].get_role() == ROLE_STAFF_OPERATOR
         assert (
-            seeded_users["noah.kim@shynebeauty.com"].get_role()
+            seeded_users["inventoryproduction@demo.com"].get_role()
             == ROLE_INVENTORY_PRODUCTION
         )
-        assert seeded_users["devops@shynebeauty.com"].get_role() == ROLE_DEV_ADMIN
+        assert seeded_users["devadmin@demo.com"].get_role() == ROLE_DEV_ADMIN
         assert (
-            seeded_users["olivia.mercer@shynebeauty.com"].check_password(
-                "ShyneDemoSuper1!"
-            )
+            seeded_users["superadmin@demo.com"].check_password("demo")
             is True
         )
         assert Customer.query.count() == 4
