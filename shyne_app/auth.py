@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import secrets
 import string
@@ -14,6 +15,7 @@ from dotenv import dotenv_values
 from flask import (
     Flask,
     flash,
+    got_request_exception,
     redirect,
     render_template,
     request,
@@ -45,6 +47,8 @@ from .config import *
 from .extensions import app, db, login_manager
 from .models import *
 from .access import *
+
+_logger = logging.getLogger("shynebeauty.errors")
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(error):
@@ -108,6 +112,18 @@ def handle_db_error(error):
         error_title="Database unavailable",
         error_message="The database is temporarily unavailable. Please try again in a moment.",
     ), 503
+
+
+def _log_exception(sender, exception, **extra):
+    _logger.error(
+        "unhandled exception | path=%s | %s: %s",
+        request.path,
+        type(exception).__name__,
+        exception,
+        exc_info=True,
+    )
+
+got_request_exception.connect(_log_exception, app)
 
 
 def current_request_next_target():

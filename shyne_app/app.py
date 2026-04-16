@@ -1,5 +1,39 @@
+import logging
+import logging.handlers
+
 from .config import *
 from .extensions import app, init_extensions
+
+
+def _configure_logging(runtime: str, log_dir) -> None:
+    log_dir = log_dir if hasattr(log_dir, "mkdir") else __import__("pathlib").Path(log_dir)
+    log_dir.mkdir(exist_ok=True)
+
+    level = logging.DEBUG if runtime == APP_RUNTIME_DEMO_DEV else logging.INFO
+    fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        log_dir / "shynebeauty.log",
+        when="midnight",
+        backupCount=30,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(fmt)
+    file_handler.setLevel(level)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(fmt)
+    console_handler.setLevel(logging.WARNING)
+
+    logger = logging.getLogger("shynebeauty")
+    logger.setLevel(level)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    logger.propagate = False
+
 
 # Config docs and local setup store dotenv files at project root
 load_project_env(BASE_DIR.parent)
@@ -37,6 +71,15 @@ if app.config["APP_RUNTIME"] == APP_RUNTIME_LIVE_PROD and env_flag(
     "FLASK_DEBUG", default=False
 ):
     raise RuntimeError("FLASK_DEBUG must not be enabled in live-prod.")
+
+_configure_logging(app.config["APP_RUNTIME"], BASE_DIR.parent / "logs")
+
+_logger = logging.getLogger("shynebeauty.startup")
+_logger.info(
+    "ShyneBeauty starting | runtime=%s | debug=%s",
+    app.config["APP_RUNTIME"],
+    app.debug,
+)
 
 init_extensions(app)
 

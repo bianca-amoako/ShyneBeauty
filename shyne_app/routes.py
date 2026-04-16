@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import os
 import secrets
 import string
@@ -50,6 +51,8 @@ from .extensions import app, db, login_manager
 from .models import *
 from .access import *
 from .auth import *
+
+_logger = logging.getLogger("shynebeauty.auth")
 
 
 def _request_client_ip():
@@ -159,9 +162,12 @@ def login():
 
             now = utc_now()
 
+            client_ip = _request_client_ip()
             if throttle.is_locked(now):
+                _logger.warning("login blocked — IP throttle active | ip=%s email=%s", client_ip, email)
                 flash("Invalid email or password.", "error")
             elif admin_user and admin_user.is_locked(now):
+                _logger.warning("login blocked — account locked | ip=%s email=%s", client_ip, email)
                 flash("Invalid email or password.", "error")
             elif (
                 admin_user
@@ -179,6 +185,7 @@ def login():
                     if next_url:
                         session["pending_mfa_next"] = next_url
                     db.session.commit()
+                    _logger.info("login: MFA challenge started | ip=%s email=%s", client_ip, email)
                     return redirect(url_for("mfa_challenge"))
 
                 admin_user.last_login_at = now
@@ -186,6 +193,7 @@ def login():
 
                 session.clear()
                 login_user(admin_user, remember=remember_me)
+                _logger.info("login success | ip=%s email=%s role=%s", client_ip, email, admin_user.get_role())
                 if admin_user.requires_password_change():
                     if next_url:
                         return redirect(url_for("change_password", next=next_url))
@@ -199,6 +207,7 @@ def login():
                 if admin_user:
                     admin_user.register_failed_login(now)
                 db.session.commit()
+                _logger.warning("login failed — bad credentials | ip=%s email=%s", client_ip, email)
                 flash("Invalid email or password.", "error")
 
     return render_template(
