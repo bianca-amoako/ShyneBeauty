@@ -1431,9 +1431,15 @@ def account_settings():
                 flash("Multi-factor authentication disabled.", "success")
                 return redirect(url_for("account_settings"))
 
+    elevated_roles = {ROLE_INVENTORY_PRODUCTION, ROLE_SUPERADMIN, ROLE_DEV_ADMIN}
+    show_mfa_warning = (
+        current_user.get_role() in elevated_roles
+        and not current_user.has_mfa_enabled()
+    )
     return render_template(
         "account_settings.html",
         mfa_enabled=current_user.has_mfa_enabled(),
+        show_mfa_warning=show_mfa_warning,
         **mfa_context,
     )
 
