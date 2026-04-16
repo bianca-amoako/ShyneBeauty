@@ -502,6 +502,114 @@ button {
 }
 
 /* =============================================
+   TABS
+   ============================================= */
+
+.sb-tabs {
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-tab-list {
+  display: flex;
+  border-bottom: 2px solid var(--sb-border);
+  margin-bottom: 22px;
+}
+
+.sb-tab-btn {
+  flex: 1;
+  padding: 13px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  font-family: var(--sb-font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sb-text-soft);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition:
+    color var(--sb-transition-fast),
+    border-bottom-color var(--sb-transition-fast),
+    background var(--sb-transition-fast);
+  border-radius: var(--sb-radius-sm) var(--sb-radius-sm) 0 0;
+}
+
+.sb-tab-btn:hover {
+  color: var(--sb-text-strong);
+  background: rgba(191, 227, 223, 0.15);
+}
+
+.sb-tab-btn[aria-selected="true"] {
+  color: var(--sb-text-strong);
+  border-bottom-color: var(--sb-accent-deep);
+  background: rgba(191, 227, 223, 0.12);
+}
+
+.sb-tab-panel {
+  display: none;
+}
+
+.sb-tab-panel[data-active="true"] {
+  display: block;
+  animation: sb-fade-in 0.18s ease both;
+}
+
+/* ── MFA secret code display ── */
+.sb-mfa-secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  color: var(--sb-text-strong);
+  user-select: all;
+}
+
+.sb-copy-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sb-copy-row .sb-note-box {
+  flex: 1;
+  min-width: 0;
+}
+
+.sb-copy-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(245, 238, 228, 0.80);
+  border: 1px solid rgba(215, 195, 170, 0.8);
+  border-radius: var(--sb-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sb-text);
+  cursor: pointer;
+  transition:
+    background var(--sb-transition-fast),
+    border-color var(--sb-transition-fast),
+    color var(--sb-transition-fast);
+  white-space: nowrap;
+}
+
+.sb-copy-btn:hover {
+  background: #e8d5bd;
+  color: var(--sb-text-strong);
+}
+
+.sb-copy-btn[data-copied="true"] {
+  background: var(--sb-accent);
+  border-color: var(--sb-accent-deep);
+  color: var(--sb-text-strong);
+}
+
+/* =============================================
    GRID SYSTEM
    ============================================= */
 
