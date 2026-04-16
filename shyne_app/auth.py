@@ -73,12 +73,6 @@ def enforce_rate_limits():
 @app.errorhandler(429)
 def handle_429(error):
     flash("Too many requests. Please wait a moment and try again.", "error")
-    referrer = request.referrer
-    if referrer:
-        parsed = urlparse(referrer)
-        if parsed.netloc == request.host and parsed.path:
-            safe_url = url_for("login") if parsed.path == "/" else parsed.path
-            return redirect(safe_url), 429
     return redirect(url_for("login")), 429
 
 
