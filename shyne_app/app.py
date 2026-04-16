@@ -97,5 +97,6 @@ from . import auth as _auth  # noqa: E402,F401
 from . import admin as _admin  # noqa: E402,F401
 from . import routes as _routes  # noqa: E402,F401
 from . import cli as _cli  # noqa: E402,F401
+from . import rate_limit as _rate_limit  # noqa: E402,F401
 
 _admin.register_admin_views()
