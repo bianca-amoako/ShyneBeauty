@@ -205,10 +205,28 @@ def enforce_password_change():
     return redirect(url_for("change_password"))
 
 
+@app.before_request
+def enforce_https():
+    if app.config.get("APP_RUNTIME") != APP_RUNTIME_LIVE_PROD:
+        return None
+    if not app.config.get("TRUST_PROXY_HEADERS"):
+        return None
+    proto = request.headers.get("X-Forwarded-Proto", "https")
+    if proto == "http":
+        return redirect(request.url.replace("http://", "https://", 1), code=301)
+    return None
+
+
 @app.after_request
 def add_security_headers(response):
     for header_name, header_value in SECURITY_HEADERS.items():
         response.headers.setdefault(header_name, header_value)
+
+    if app.config.get("APP_RUNTIME") == APP_RUNTIME_LIVE_PROD:
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
 
     should_disable_caching = request.endpoint != "static" and (
         request.endpoint in NO_STORE_ENDPOINTS or current_user.is_authenticated
