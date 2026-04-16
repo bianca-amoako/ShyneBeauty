@@ -252,31 +252,31 @@ NO_STORE_ENDPOINTS = {
 }
 DEMO_USER_ACCOUNTS = (
     {
-        "email": "olivia.mercer@shynebeauty.com",
+        "email": "Superadmin@demo.com",
         "full_name": "Olivia Mercer",
         "role": ROLE_SUPERADMIN,
-        "password": "ShyneDemoSuper1!",
+        "password": "demo",
         "last_login_at": datetime(2026, 4, 14, 8, 45, tzinfo=timezone.utc),
     },
     {
-        "email": "maya.brooks@shynebeauty.com",
+        "email": "StaffOperator@demo.com",
         "full_name": "Maya Brooks",
         "role": ROLE_STAFF_OPERATOR,
-        "password": "ShyneDemoStaff1!",
+        "password": "demo",
         "last_login_at": datetime(2026, 4, 13, 16, 20, tzinfo=timezone.utc),
     },
     {
-        "email": "noah.kim@shynebeauty.com",
+        "email": "InventoryProduction@demo.com",
         "full_name": "Noah Kim",
         "role": ROLE_INVENTORY_PRODUCTION,
-        "password": "ShyneDemoInventory1!",
+        "password": "demo",
         "last_login_at": None,
     },
     {
-        "email": "devops@shynebeauty.com",
+        "email": "DevAdmin@demo.com",
         "full_name": "Shyne DevOps",
         "role": ROLE_DEV_ADMIN,
-        "password": "ShyneDemoDev1!",
+        "password": "demo",
         "last_login_at": datetime(2026, 4, 14, 7, 55, tzinfo=timezone.utc),
     },
 )
