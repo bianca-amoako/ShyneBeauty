@@ -28,3 +28,7 @@ Thumbs.db
 instance/*.db
 instance/*.sqlite
 instance/*.sqlite3
+
+# Application logs
+logs/
+*.log
