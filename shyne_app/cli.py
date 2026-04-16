@@ -647,3 +647,49 @@ def backfill_admin_access_command(first_superadmin_email, dev_admin_emails):
 
     db.session.commit()
     click.echo("Admin access backfill completed.")
+
+
+@app.cli.command("export-data")
+@click.option("--output-dir", default=".", help="Directory to write the backup archive.")
+def export_data_command(output_dir):
+    """Dump both SQLite databases to a timestamped tar.gz with a SHA-256 integrity hash."""
+    import hashlib
+    import tarfile
+    from pathlib import Path
+    from urllib.parse import urlparse
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    output_path = Path(output_dir).resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
+    archive_name = f"shynebeauty-backup-{timestamp}.tar.gz"
+    archive_path = output_path / archive_name
+
+    def _db_file(uri):
+        if uri and uri.startswith("sqlite:///"):
+            p = Path(uri[len("sqlite:///"):])
+            return p if p.exists() else None
+        return None
+
+    primary_path = _db_file(app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+    auth_path = _db_file(
+        (app.config.get("SQLALCHEMY_BINDS") or {}).get(AUTH_BIND_KEY, "")
+    )
+
+    files_to_archive = [p for p in [primary_path, auth_path] if p]
+    if not files_to_archive:
+        raise click.ClickException("No SQLite database files found to back up.")
+
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for f in files_to_archive:
+            tar.add(f, arcname=f.name)
+
+    sha256 = hashlib.sha256()
+    with open(archive_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+
+    hash_path = archive_path.with_suffix(".tar.gz.sha256")
+    hash_path.write_text(f"{sha256.hexdigest()}  {archive_name}\n", encoding="utf-8")
+
+    click.echo(f"Backup written: {archive_path}")
+    click.echo(f"SHA-256:        {hash_path}")

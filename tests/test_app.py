@@ -938,3 +938,28 @@ def test_health_requires_no_authentication(client):
     # unauthenticated request must not redirect to login
     response = client.get("/health")
     assert response.status_code == 200
+
+
+def test_export_data_command_creates_archive(app):
+    import hashlib
+    import tarfile
+    import tempfile
+    from pathlib import Path
+    from click.testing import CliRunner
+    from shyne_app.cli import export_data_command
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runner = CliRunner()
+        with app.app_context():
+            result = runner.invoke(export_data_command, ["--output-dir", tmpdir])
+        assert result.exit_code == 0, result.output
+        archives = list(Path(tmpdir).glob("shynebeauty-backup-*.tar.gz"))
+        assert len(archives) == 1, f"Expected one archive, got: {archives}"
+        hashes = list(Path(tmpdir).glob("*.sha256"))
+        assert len(hashes) == 1, f"Expected one hash file, got: {hashes}"
+        sha256 = hashlib.sha256()
+        with open(archives[0], "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+        hash_line = hashes[0].read_text(encoding="utf-8").strip()
+        assert hash_line.startswith(sha256.hexdigest())

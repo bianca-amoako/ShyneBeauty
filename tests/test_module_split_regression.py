@@ -20,3 +20,4 @@ def test_shyne_facade_keeps_core_routes_and_cli_commands():
     assert "create-admin" in app.cli.commands
     assert "create-dev-admin" in app.cli.commands
     assert "backfill-admin-access" in app.cli.commands
+    assert "export-data" in app.cli.commands
