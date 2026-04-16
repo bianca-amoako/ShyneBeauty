@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ error_code }} | ShyneBeauty</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='shyneIcon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shyne.css') }}">
+</head>
+<body class="sb-login-body">
+  <main class="sb-login-shell" role="main">
+    <section class="sb-login-panel" aria-labelledby="error-heading">
+      <div class="sb-brand-mark">
+        <img class="sb-brand-icon" src="{{ url_for('static', filename='shyneIcon.png') }}" alt="ShyneBeauty" width="52" height="52">
+        <div>
+          <strong class="sb-brand-name">ShyneBeauty</strong>
+          <span class="sb-brand-kicker">Internal Operations</span>
+        </div>
+      </div>
+      <p class="sb-eyebrow">Error {{ error_code }}</p>
+      <h1 id="error-heading">{{ error_title }}</h1>
+      <p class="sb-section-note" style="margin-bottom: 1.5rem;">{{ error_message }}</p>
+      {% if current_user and current_user.is_authenticated %}
+        <a href="{{ url_for('index') }}" class="sb-submit" style="display:block;text-align:center;text-decoration:none;padding:14px 20px;">
+          Back to dashboard
+        </a>
+      {% else %}
+        <a href="{{ url_for('login') }}" class="sb-submit" style="display:block;text-align:center;text-decoration:none;padding:14px 20px;">
+          Go to login
+        </a>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

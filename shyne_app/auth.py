@@ -80,6 +80,36 @@ def handle_csrf_error(error):
     return redirect(url_for("index"))
 
 
+@app.errorhandler(404)
+def handle_404(error):
+    return render_template(
+        "error.html",
+        error_code=404,
+        error_title="Page not found",
+        error_message="The page you're looking for doesn't exist or has been moved.",
+    ), 404
+
+
+@app.errorhandler(500)
+def handle_500(error):
+    return render_template(
+        "error.html",
+        error_code=500,
+        error_title="Something went wrong",
+        error_message="An unexpected error occurred. Please try again or contact a Dev Admin.",
+    ), 500
+
+
+@app.errorhandler(OperationalError)
+def handle_db_error(error):
+    return render_template(
+        "error.html",
+        error_code=503,
+        error_title="Database unavailable",
+        error_message="The database is temporarily unavailable. Please try again in a moment.",
+    ), 503
+
+
 def current_request_next_target():
     if request.query_string:
         return f"{request.path}?{request.query_string.decode('utf-8')}"
