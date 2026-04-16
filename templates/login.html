@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='shyneIcon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shyne.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login-animations.css') }}">
 </head>
 
 <body class="sb-login-body">
@@ -97,5 +98,48 @@
       </p>
     </section>
   </main>
+  <script>
+    (function () {
+      'use strict';
+
+      var panel     = document.querySelector('.sb-login-panel');
+      var form      = document.querySelector('form');
+      var submitBtn = document.querySelector('.sb-submit');
+      var fields    = document.querySelectorAll('.sb-field-float');
+      var errorMsg  = document.querySelector('.sb-message-error');
+
+      // wait for entrance animations before shaking error fields
+      if (errorMsg && fields.length) {
+        setTimeout(function () {
+          fields.forEach(function (f) { f.classList.add('sb-field--error'); });
+          setTimeout(function () {
+            fields.forEach(function (f) { f.classList.remove('sb-field--error'); });
+          }, 700);
+        }, 500);
+      }
+
+      if (form && panel && submitBtn) {
+        form.addEventListener('submit', function () {
+          if (panel.classList.contains('sb-login-panel--submitting')) return;
+          panel.classList.add('sb-login-panel--submitting');
+          submitBtn.setAttribute('aria-label', 'Signing in\u2026');
+          // restore UI if navigation never fires
+          var safetyTimer = setTimeout(function () {
+            panel.classList.remove('sb-login-panel--submitting');
+            submitBtn.removeAttribute('aria-label');
+          }, 8000);
+          window.addEventListener('pagehide', function () { clearTimeout(safetyTimer); });
+        });
+      }
+
+      fields.forEach(function (field) {
+        var input = field.querySelector('.sb-input');
+        if (!input) return;
+        input.addEventListener('input', function () {
+          field.classList.remove('sb-field--error');
+        });
+      });
+    }());
+  </script>
 </body>
 </html>
