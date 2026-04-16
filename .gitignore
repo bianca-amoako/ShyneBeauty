@@ -32,3 +32,6 @@ instance/*.sqlite3
 # Application logs
 logs/
 *.log
+
+# Git worktrees
+.worktrees/
