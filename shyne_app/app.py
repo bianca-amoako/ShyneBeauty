@@ -81,6 +81,14 @@ _logger.info(
     app.debug,
 )
 
+if app.config["APP_RUNTIME"] == APP_RUNTIME_LIVE_PROD and not app.config.get("SESSION_COOKIE_SECURE"):
+    import warnings
+    warnings.warn(
+        "SESSION_COOKIE_SECURE is False in live-prod — session cookies will be sent over HTTP. "
+        "Set SESSION_COOKIE_SECURE=true and deploy behind HTTPS.",
+        stacklevel=1,
+    )
+
 init_extensions(app)
 
 from . import models as _models  # noqa: E402,F401
