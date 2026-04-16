@@ -1,3 +1,4 @@
+import re
 import threading
 import time
 from collections import defaultdict
@@ -5,7 +6,14 @@ from collections import defaultdict
 _SENSITIVE_POST_PATHS = frozenset({
     "/change-password",
     "/account/settings",
+    "/login",
+    "/users/invite",
 })
+
+_SENSITIVE_POST_PATH_PATTERNS = (
+    re.compile(r"^/users/\d+/temporary-password$"),
+    re.compile(r"^/users/\d+/resend-invite$"),
+)
 
 _SENSITIVE_POST_LIMIT = 30   # requests per minute
 _ADMIN_LIMIT = 60            # requests per minute
@@ -43,8 +51,11 @@ _limiter = _RateLimiter()
 
 
 def check_rate_limit(ip: str, path: str, method: str) -> bool:
-    if method == "POST" and path in _SENSITIVE_POST_PATHS:
-        return _limiter.is_allowed(f"post:{ip}:{path}", _SENSITIVE_POST_LIMIT, _WINDOW)
+    if method == "POST":
+        if path in _SENSITIVE_POST_PATHS:
+            return _limiter.is_allowed(f"post:{ip}:{path}", _SENSITIVE_POST_LIMIT, _WINDOW)
+        if any(p.match(path) for p in _SENSITIVE_POST_PATH_PATTERNS):
+            return _limiter.is_allowed(f"post:{ip}:users-auth", _SENSITIVE_POST_LIMIT, _WINDOW)
 
     if path.startswith("/admin"):
         return _limiter.is_allowed(f"admin:{ip}", _ADMIN_LIMIT, _WINDOW)

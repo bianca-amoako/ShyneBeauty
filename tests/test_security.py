@@ -1356,3 +1356,35 @@ def test_runtime_auth_schema_compatibility_upgrades_legacy_admin_table_before_us
             db.session.remove()
             db.drop_all(bind_key=AUTH_BIND_KEY)
             db.create_all(bind_key=AUTH_BIND_KEY)
+
+
+def test_login_path_is_rate_limited():
+    from shyne_app.rate_limit import check_rate_limit, _SENSITIVE_POST_LIMIT
+    ip = "192.0.2.10"
+    for _ in range(_SENSITIVE_POST_LIMIT):
+        check_rate_limit(ip, "/login", "POST")
+    assert check_rate_limit(ip, "/login", "POST") is False
+
+
+def test_invite_path_is_rate_limited():
+    from shyne_app.rate_limit import check_rate_limit, _SENSITIVE_POST_LIMIT
+    ip = "192.0.2.11"
+    for _ in range(_SENSITIVE_POST_LIMIT):
+        check_rate_limit(ip, "/users/invite", "POST")
+    assert check_rate_limit(ip, "/users/invite", "POST") is False
+
+
+def test_temporary_password_path_is_rate_limited():
+    from shyne_app.rate_limit import check_rate_limit, _SENSITIVE_POST_LIMIT
+    ip = "192.0.2.12"
+    for _ in range(_SENSITIVE_POST_LIMIT):
+        check_rate_limit(ip, "/users/42/temporary-password", "POST")
+    assert check_rate_limit(ip, "/users/42/temporary-password", "POST") is False
+
+
+def test_resend_invite_path_is_rate_limited():
+    from shyne_app.rate_limit import check_rate_limit, _SENSITIVE_POST_LIMIT
+    ip = "192.0.2.13"
+    for _ in range(_SENSITIVE_POST_LIMIT):
+        check_rate_limit(ip, "/users/99/resend-invite", "POST")
+    assert check_rate_limit(ip, "/users/99/resend-invite", "POST") is False
