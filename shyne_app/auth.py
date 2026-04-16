@@ -14,6 +14,7 @@ import click
 from dotenv import dotenv_values
 from flask import (
     Flask,
+    abort,
     flash,
     got_request_exception,
     redirect,
@@ -47,6 +48,38 @@ from .config import *
 from .extensions import app, db, login_manager
 from .models import *
 from .access import *
+from .rate_limit import check_rate_limit
+
+
+def _rate_limit_client_ip():
+    if app.config.get("TRUST_PROXY_HEADERS"):
+        forwarded = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if forwarded:
+            return forwarded
+    return request.remote_addr or "unknown"
+
+
+@app.before_request
+def enforce_rate_limits():
+    if app.config.get("TESTING"):
+        return None
+    if request.endpoint == "static":
+        return None
+    if not check_rate_limit(_rate_limit_client_ip(), request.path, request.method):
+        abort(429)
+    return None
+
+
+@app.errorhandler(429)
+def handle_429(error):
+    flash("Too many requests. Please wait a moment and try again.", "error")
+    referrer = request.referrer
+    if referrer:
+        parsed = urlparse(referrer)
+        if parsed.netloc == request.host:
+            return redirect(referrer), 429
+    return redirect(url_for("login")), 429
+
 
 _logger = logging.getLogger("shynebeauty.errors")
 
