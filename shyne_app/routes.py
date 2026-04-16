@@ -19,6 +19,7 @@ import qrcode.image.svg
 from flask import (
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -101,6 +102,15 @@ def _mfa_provisioning_context(admin_user, *, session_key="mfa_enrollment_secret"
         "provisioning_uri": provisioning_uri,
         "qr_svg_markup": qr_svg_markup,
     }
+
+@app.route("/health")
+def health():
+    try:
+        db.session.execute(text("SELECT 1"))
+        return jsonify(status="ok"), 200
+    except Exception:
+        return jsonify(status="error"), 503
+
 
 @app.route("/")
 @require_permission(PERMISSION_DASHBOARD_VIEW)

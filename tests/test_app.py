@@ -925,3 +925,16 @@ def test_google_sheets_source_filter_and_dashboard_count_use_canonical_value(
     assert "Cora Canonical" in filtered_text
     assert "Lena Legacy" not in filtered_text
     assert re.search(r"Google Sheets</td>\s*<td>1</td>", dashboard_text)
+
+
+def test_health_returns_ok(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["status"] == "ok"
+
+
+def test_health_requires_no_authentication(client):
+    # unauthenticated request must not redirect to login
+    response = client.get("/health")
+    assert response.status_code == 200
