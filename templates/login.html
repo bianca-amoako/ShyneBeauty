@@ -122,11 +122,8 @@
         form.addEventListener('submit', function () {
           if (panel.classList.contains('sb-login-panel--submitting')) return;
           panel.classList.add('sb-login-panel--submitting');
-          submitBtn.setAttribute('aria-label', 'Signing in\u2026');
-          // restore UI if navigation never fires
           var safetyTimer = setTimeout(function () {
             panel.classList.remove('sb-login-panel--submitting');
-            submitBtn.removeAttribute('aria-label');
           }, 8000);
           window.addEventListener('pagehide', function () { clearTimeout(safetyTimer); });
         });
