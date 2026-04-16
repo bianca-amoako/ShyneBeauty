@@ -377,6 +377,7 @@ class AdminLoginThrottle(db.Model):
     failed_login_count = db.Column(db.Integer, nullable=False, default=0)
     locked_until = db.Column(db.DateTime(timezone=True))
     last_failed_at = db.Column(db.DateTime(timezone=True))
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     def is_locked(self, now=None):
         if self.locked_until is None:
