@@ -1,0 +1,358 @@
+/* Login page animations — scoped to .sb-login-body / .sb-login-panel only */
+
+:root {
+  --sba-orb-cool: 22s;
+  --sba-orb-warm: 28s;
+
+  --sba-d-panel:   0.00s;
+  --sba-d-icon:    0.05s;
+  --sba-d-brand:   0.13s;
+  --sba-d-eyebrow: 0.20s;
+  --sba-d-heading: 0.28s;
+  --sba-d-flash:   0.35s;
+  --sba-d-field1:  0.40s;
+  --sba-d-field2:  0.50s;
+  --sba-d-meta:    0.60s;
+  --sba-d-submit:  0.70s;
+  --sba-d-helper:  0.82s;
+  --sba-d-shimmer: 1.80s;
+
+  --sba-ease-luxury: cubic-bezier(0.22, 1, 0.36, 1);
+  --sba-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sba-ease-snap:   cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes sba-orb-cool {
+  0%   { transform: translate(0%, 0%)    scale(1.00); opacity: 0.55; }
+  50%  { transform: translate(2%, -1.5%) scale(1.04); opacity: 0.65; }
+  100% { transform: translate(-1%, 1%)   scale(0.98); opacity: 0.55; }
+}
+@keyframes sba-orb-warm {
+  0%   { transform: translate(0%, 0%)    scale(1.00); opacity: 0.45; }
+  50%  { transform: translate(-2.5%, 1%) scale(1.06); opacity: 0.55; }
+  100% { transform: translate(1%, -2%)   scale(1.02); opacity: 0.45; }
+}
+
+@keyframes sba-panel-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+    backdrop-filter: blur(0px) saturate(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    backdrop-filter: blur(20px) saturate(1.6);
+  }
+}
+
+@keyframes sba-reveal-up {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+    filter: blur(4px);
+  }
+  60% { filter: blur(0px); }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes sba-reveal-icon {
+  0%   { opacity: 0; transform: scale(0.72) rotate(-6deg); filter: blur(6px); }
+  70%  { filter: blur(0px); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0px); }
+}
+
+@keyframes sba-reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sba-message-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sba-icon-shimmer {
+  0%   { transform: translateX(-160%) rotate(0deg); opacity: 0; }
+  20%  { opacity: 0.65; }
+  100% { transform: translateX(220%) rotate(0deg); opacity: 0; }
+}
+
+@keyframes sba-pulse-ring {
+  0%   { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.20); }
+}
+
+@keyframes sba-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sba-shake {
+  0%   { transform: translateX(0);   }
+  15%  { transform: translateX(-7px);}
+  35%  { transform: translateX(6px); }
+  55%  { transform: translateX(-5px);}
+  70%  { transform: translateX(4px); }
+  82%  { transform: translateX(-2px);}
+  92%  { transform: translateX(1px); }
+  100% { transform: translateX(0);   }
+}
+
+/* Background orbs */
+
+.sb-login-body {
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-login-body::before {
+  content: '';
+  position: fixed;
+  top: -10%;
+  left: -10%;
+  width: 65vmax;
+  height: 65vmax;
+  background: radial-gradient(
+    ellipse at 40% 40%,
+    rgba(191, 227, 223, 0.30) 0%,
+    rgba(138, 185, 178, 0.13) 45%,
+    transparent 70%
+  );
+  pointer-events: none;
+  will-change: transform;
+  animation: sba-orb-cool var(--sba-orb-cool) ease-in-out infinite alternate;
+  z-index: 0;
+}
+
+.sb-login-body::after {
+  content: '';
+  position: fixed;
+  bottom: -10%;
+  right: -10%;
+  width: 55vmax;
+  height: 55vmax;
+  background: radial-gradient(
+    ellipse at 60% 60%,
+    rgba(200, 168, 130, 0.24) 0%,
+    rgba(232, 213, 187, 0.11) 45%,
+    transparent 70%
+  );
+  pointer-events: none;
+  will-change: transform;
+  animation: sba-orb-warm var(--sba-orb-warm) ease-in-out infinite alternate-reverse;
+  z-index: 0;
+}
+
+.sb-login-shell {
+  position: relative;
+  z-index: 1;
+}
+
+/* Panel entrance */
+
+.sb-login-panel {
+  animation:
+    sba-panel-arrive 0.60s var(--sba-ease-luxury) var(--sba-d-panel) both;
+}
+
+/* Staggered element reveals */
+
+.sb-brand-icon {
+  animation:
+    sba-reveal-icon 0.50s var(--sba-ease-spring) var(--sba-d-icon) both;
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-brand-mark > div {
+  animation: sba-reveal-up 0.50s var(--sba-ease-luxury) var(--sba-d-brand) both;
+}
+
+.sb-eyebrow {
+  animation: sba-reveal-fade 0.40s ease var(--sba-d-eyebrow) both;
+}
+
+.sb-login-panel h1 {
+  animation: sba-reveal-up 0.55s var(--sba-ease-luxury) var(--sba-d-heading) both;
+}
+
+.sb-message-stack {
+  animation: sba-message-enter 0.35s var(--sba-ease-luxury) var(--sba-d-flash) both;
+}
+
+/* MFA has one field; login has two — last-of-type picks up field2 timing */
+.sb-login-panel .sb-field-float {
+  animation: sba-reveal-up 0.45s var(--sba-ease-luxury) var(--sba-d-field1) both;
+}
+.sb-login-panel form .sb-field-float:last-of-type {
+  animation: sba-reveal-up 0.45s var(--sba-ease-luxury) var(--sba-d-field2) both;
+}
+
+.sb-form-meta {
+  animation: sba-reveal-up 0.40s var(--sba-ease-luxury) var(--sba-d-meta) both;
+}
+
+.sb-submit {
+  animation: sba-reveal-up 0.50s var(--sba-ease-luxury) var(--sba-d-submit) both;
+}
+
+.sb-helper {
+  animation: sba-reveal-fade 0.40s ease var(--sba-d-helper) both;
+}
+
+/* Icon shimmer */
+
+.sb-brand-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.60) 50%,
+    transparent 70%
+  );
+  transform: translateX(-160%);
+  will-change: transform;
+  animation: sba-icon-shimmer 0.80s ease var(--sba-d-shimmer) 1 both;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Submit button */
+
+.sb-submit {
+  background: linear-gradient(
+    110deg,
+    var(--sb-accent-deep)  0%,
+    var(--sb-accent)       40%,
+    rgba(255,255,255,0.18) 55%,
+    var(--sb-accent)       70%,
+    var(--sb-accent-soft)  100%
+  );
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  transition:
+    transform     var(--sb-transition-base),
+    box-shadow    var(--sb-transition-base),
+    filter        var(--sb-transition-base),
+    background-position 0.45s ease;
+}
+
+.sb-submit:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow:
+    0 12px 32px rgba(138, 185, 178, 0.50),
+    0 4px  12px rgba(138, 185, 178, 0.25),
+    inset 0 1px 0 rgba(255,255,255,0.40);
+  filter: brightness(1.05) saturate(1.1);
+  background-position: 0% 0;
+}
+
+.sb-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+  transition-duration: 0.08s;
+}
+
+/* Input focus lift */
+
+.sb-login-panel .sb-field-float:focus-within {
+  transform: translateY(-1px);
+  transition: transform var(--sb-transition-base);
+}
+
+/* Error shake */
+
+.sb-field--error .sb-input {
+  border-bottom-color: #c97b6a !important;
+  background: rgba(243, 215, 200, 0.35) !important;
+  animation: sba-shake 0.50s var(--sba-ease-snap) both;
+}
+.sb-field--error label {
+  color: #b5604e;
+  transition: color var(--sb-transition-fast);
+}
+
+/* Loading state */
+
+.sb-login-panel--submitting .sb-submit {
+  pointer-events: none;
+  opacity: 0.82;
+  cursor: wait;
+  color: transparent;
+  position: relative;
+}
+
+.sb-login-panel--submitting .sb-submit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  border-top-color:  rgba(255, 255, 255, 0.85);
+  border-right-color: rgba(255, 255, 255, 0.35);
+  animation: sba-spin 0.70s linear infinite;
+}
+
+.sb-login-panel--submitting .sb-submit::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 2px solid var(--sb-accent);
+  animation: sba-pulse-ring 1s ease-out infinite;
+}
+
+.sb-login-panel--submitting .sb-input,
+.sb-login-panel--submitting .sb-checkbox-wrap {
+  pointer-events: none;
+  opacity: 0.72;
+  transition: opacity 0.20s ease;
+}
+
+/* prefers-reduced-motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-login-body::before,
+  .sb-login-body::after {
+    display: none;
+  }
+
+  .sb-login-panel,
+  .sb-brand-icon,
+  .sb-brand-icon::after,
+  .sb-brand-mark > div,
+  .sb-eyebrow,
+  .sb-login-panel h1,
+  .sb-message-stack,
+  .sb-login-panel form .sb-field-float,
+  .sb-login-panel .sb-field-float,
+  .sb-form-meta,
+  .sb-submit,
+  .sb-helper {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .sb-submit {
+    background-position: 100% 0 !important;
+    transition: none;
+  }
+
+  .sb-input:focus {
+    box-shadow: var(--sb-shadow-glow-accent), var(--sb-shadow-inset) !important;
+    border-bottom-color: var(--sb-accent-deep) !important;
+  }
+
+  .sb-field--error .sb-input {
+    animation: none !important;
+    border-bottom-color: #c97b6a !important;
+    background: rgba(243, 215, 200, 0.35) !important;
+  }
+}
