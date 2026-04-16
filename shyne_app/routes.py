@@ -555,7 +555,7 @@ def generate_order_number():
         try:
             last_num = int(last_order.order_number.split('-')[-1])
             new_num = last_num + 1
-        except:
+        except (ValueError, AttributeError):
             new_num = 1
     else:
         new_num = 1
