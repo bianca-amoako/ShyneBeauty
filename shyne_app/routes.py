@@ -588,7 +588,6 @@ def add_order():
     products = Product.query.filter_by(active=True).order_by(Product.name).all()
 
     form_data = {
-        "order_number": "",
         "customer_id": "",
         "platform": "Direct",
         "status": "Placed",
@@ -598,7 +597,6 @@ def add_order():
 
     if request.method == "POST":
         form_data = {
-            "order_number": (request.form.get("order_number") or "").strip(),
             "customer_id": (request.form.get("customer_id") or "").strip(),
             "platform": (request.form.get("platform") or "").strip(),
             "status": (request.form.get("status") or "").strip(),
@@ -614,13 +612,6 @@ def add_order():
 
         if not line_item_lengths_match:
             errors.append("Each line item must include a product, quantity, and price.")
-
-        if not form_data["order_number"]:
-            errors.append("Order number is required.")
-        elif Order.query.filter(
-            func.lower(Order.order_number) == form_data["order_number"].lower()
-        ).first():
-            errors.append("An order with that number already exists.")
 
         if not form_data["customer_id"]:
             errors.append("Customer is required.")
@@ -696,7 +687,7 @@ def add_order():
         if not errors:
             order = Order(
                 customer=customer,
-                order_number=form_data["order_number"],
+                order_number=generate_order_number(),
                 platform=form_data["platform"],
                 total_amount=total_amount,
                 status=form_data["status"],
