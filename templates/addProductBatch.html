@@ -1,0 +1,104 @@
+{% extends "base_authenticated.html" %}
+{% from "_form_helpers.html" import csrf_input %}
+
+{% block page_title %}{% if is_edit %}Edit Product Batch{% else %}Add Product Batch{% endif %}{% endblock %}
+{% block page_description %}
+  {% if is_edit %}
+    <p>Update stock levels for {{ form_data.product_name }} - Lot: {{ form_data.lot_number }}</p>
+  {% else %}
+    <p>Add a new product batch (lot) to track inventory by batch.</p>
+  {% endif %}
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
+  <a class="sb-button" href="{{ url_for('product_batches') }}">View batches</a>
+{% endblock %}
+
+{% block content %}
+  <div class="sb-panel">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="{% if is_edit %}{{ url_for('edit_product_batch', batch_id=edit_batch_id) }}{% else %}{{ url_for('add_product_batch') }}{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+
+      {% if is_edit %}
+        <!-- Edit mode - show read-only product info -->
+        <div class="sb-grid sb-grid-2">
+          <div>
+            <label><b>Product</b></label>
+            <input class="w3-input w3-border w3-margin-bottom" type="text" value="{{ form_data.product_name }}" disabled style="background-color: #f5f5f5;">
+          </div>
+          <div>
+            <label><b>Lot Number</b></label>
+            <input class="w3-input w3-border w3-margin-bottom" type="text" value="{{ form_data.lot_number }}" disabled style="background-color: #f5f5f5;">
+          </div>
+        </div>
+        
+        <!-- Hidden fields for edit mode -->
+        <input type="hidden" name="product_id" value="{{ form_data.product_id }}">
+        <input type="hidden" name="batch_id" value="{{ form_data.batch_id }}">
+        <input type="hidden" name="lot_number" value="{{ form_data.lot_number }}">
+      {% else %}
+        <!-- Add mode - show all fields -->
+        <label><b>Product *</b></label>
+        <select class="w3-select w3-border w3-margin-bottom" name="product_id" required>
+          <option value="">Select Product</option>
+          {% for product in products %}
+            <option value="{{ product.id }}" {% if form_data.product_id == product.id|string %}selected{% endif %}>
+              {{ product.name }} ({{ product.sku }}) - ${{ "%.2f"|format(product.price) }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <label><b>Batch Code *</b></label>
+        <input class="w3-input w3-border w3-margin-bottom" type="text" name="batch_code" placeholder="e.g., BATCH-2024-001" value="{{ form_data.batch_code }}" required>
+
+        <label><b>Lot Number *</b></label>
+        <input class="w3-input w3-border w3-margin-bottom" type="text" name="lot_number" placeholder="e.g., LOT-LIP-001-2024" value="{{ form_data.lot_number }}" required>
+      {% endif %}
+
+      <div class="sb-grid sb-grid-2">
+        <div>
+          <label><b>Units Produced *</b></label>
+          <input class="w3-input w3-border w3-margin-bottom" type="number" name="units_produced" placeholder="Number of units produced" value="{{ form_data.units_produced }}" required>
+          {% if is_edit %}<small>Total units ever produced in this batch</small>{% endif %}
+        </div>
+        <div>
+          <label><b>Units Available (Stock) *</b></label>
+          <input class="w3-input w3-border w3-margin-bottom" type="number" name="units_available" placeholder="Available units for sale" value="{{ form_data.units_available }}" required>
+          {% if is_edit %}<small>Current sellable units in stock</small>{% endif %}
+        </div>
+      </div>
+
+      <label><b>Expiry Date</b></label>
+      <input class="w3-input w3-border w3-margin-bottom" type="date" name="expiry_date" value="{{ form_data.expiry_date }}">
+      {% if is_edit %}<small>Leave empty if no expiry</small>{% endif %}
+
+      <div class="sb-form-actions" style="margin-top: 20px;">
+        <button class="sb-button" type="submit">{% if is_edit %}Update Stock{% else %}Create Product Batch{% endif %}</button>
+        <a class="sb-button-secondary" href="{{ url_for('product_batches') }}">Cancel</a>
+      </div>
+    </form>
+
+    {% if is_edit %}
+      <hr>
+      <div class="sb-panel" style="margin-top: 20px; background-color: #f9f7f4;">
+        <h4>Quick Stock Adjustment Tips:</h4>
+        <ul>
+          <li><strong>When you sell products:</strong> Decrease "Units Available"</li>
+          <li><strong>When you receive new stock:</strong> Increase "Units Available"</li>
+          <li><strong>When stock expires:</strong> Decrease "Units Available" to 0</li>
+          <li><strong>Units Produced</strong> should stay as the original batch size</li>
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

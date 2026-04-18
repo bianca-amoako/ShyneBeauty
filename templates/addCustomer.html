@@ -1,9 +1,13 @@
 {% extends "base_authenticated.html" %}
 {% from "_form_helpers.html" import csrf_input %}
 
-{% block page_title %}Add Customer{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Customer{% else %}Add Customer{% endif %}{% endblock %}
 {% block page_description %}
-  <p>Create a customer record for internal order tracking and contact lookup.</p>
+  {% if is_edit %}
+    <p>Edit customer #{{ edit_customer_id }}. Update customer information below.</p>
+  {% else %}
+    <p>Create a customer record for internal order tracking and contact lookup.</p>
+  {% endif %}
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
@@ -14,8 +18,20 @@
   <section class="sb-panel">
     <h2>Customer details</h2>
     <p class="sb-section-note">Required fields: first name, last name, and email.</p>
-    <form class="sb-form-grid" method="post" action="{{ url_for('add_customer') }}" novalidate>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{% if category == 'error' %}error-message{% else %}success-message{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    
+    <form class="sb-form-grid" method="post" action="{% if is_edit %}{{ url_for('edit_customer', customer_id=edit_customer_id) }}{% else %}{{ url_for('add_customer') }}{% endif %}" novalidate>
       {{ csrf_input() }}
+      
       <div class="sb-form-row">
         <div class="sb-field sb-field-float">
           <input class="sb-input" id="customer-first-name" name="first_name" type="text" autocomplete="given-name" placeholder=" " value="{{ form_data.first_name }}" required>
@@ -28,7 +44,7 @@
         <div class="sb-field sb-field-select">
           <label class="sb-label-above" for="customer-source">Source</label>
           <div class="sb-select-wrap">
-            <select class="sb-select" id="customer-source" name="source">
+            <select class="sb-select" id="customer-source" name="source" {% if is_edit %}disabled{% endif %}>
               <option value="">Select source</option>
               {% for source in source_options %}
                 <option value="{{ source }}" {% if form_data.source == source %}selected{% endif %}>{{ source }}</option>
@@ -36,11 +52,15 @@
             </select>
             <span class="sb-select-arrow" aria-hidden="true"></span>
           </div>
+          {% if is_edit %}
+            <small class="sb-field-note">Source cannot be changed after customer creation.</small>
+          {% endif %}
         </div>
       </div>
+      
       <div class="sb-form-row">
         <div class="sb-field sb-field-float">
-          <input class="sb-input" id="customer-email" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder=" " value="{{ form_data.email }}" required>
+          <input class="sb-input" id="customer-email" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder=" " value="{{ form_data.email }}" required {% if is_edit %}readonly style="background-color: #f5f5f5;"{% endif %}>
           <label for="customer-email">Email</label>
         </div>
         <div class="sb-field sb-field-float">
@@ -52,10 +72,12 @@
           <label for="customer-country">Country</label>
         </div>
       </div>
+      
       <div class="sb-field sb-field-float">
         <input class="sb-input" id="customer-address" name="street_address" type="text" autocomplete="street-address" placeholder=" " value="{{ form_data.street_address }}">
         <label for="customer-address">Street Address</label>
       </div>
+      
       <div class="sb-form-row">
         <div class="sb-field sb-field-float">
           <input class="sb-input" id="customer-city" name="city" type="text" autocomplete="address-level2" placeholder=" " value="{{ form_data.city }}">
@@ -70,8 +92,9 @@
           <label for="customer-postal-code">Postal Code</label>
         </div>
       </div>
+      
       <div class="sb-form-actions">
-        <button class="sb-button" type="submit">Create customer</button>
+        <button class="sb-button" type="submit">{% if is_edit %}Save Changes{% else %}Create customer{% endif %}</button>
         <a class="sb-button-secondary" href="{{ url_for('customers') }}">Cancel</a>
       </div>
     </form>

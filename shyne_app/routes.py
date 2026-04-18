@@ -4,7 +4,7 @@ import logging
 import os
 import secrets
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 from pathlib import Path
@@ -490,77 +490,143 @@ def add_customer():
     form_data = {
         "first_name": "",
         "last_name": "",
-        "source": "",
         "email": "",
         "phone": "",
-        "country": "USA",
+        "source": "",
         "street_address": "",
         "city": "",
         "state": "",
         "postal_code": "",
+        "country": "USA",
     }
-
+    
     if request.method == "POST":
         form_data = {
             "first_name": (request.form.get("first_name") or "").strip(),
             "last_name": (request.form.get("last_name") or "").strip(),
-            "source": (request.form.get("source") or "").strip(),
-            "email": normalize_email(request.form.get("email")),
+            "email": (request.form.get("email") or "").strip().lower(),
             "phone": (request.form.get("phone") or "").strip(),
-            "country": (request.form.get("country") or "").strip() or "USA",
+            "source": (request.form.get("source") or "").strip(),
             "street_address": (request.form.get("street_address") or "").strip(),
             "city": (request.form.get("city") or "").strip(),
             "state": (request.form.get("state") or "").strip(),
             "postal_code": (request.form.get("postal_code") or "").strip(),
+            "country": (request.form.get("country") or "").strip() or "USA",
         }
-
+        
         errors = []
+        
         if not form_data["first_name"]:
             errors.append("First name is required.")
         if not form_data["last_name"]:
             errors.append("Last name is required.")
         if not form_data["email"]:
             errors.append("Email is required.")
-
-        existing_customer = None
+        
         if form_data["email"]:
-            existing_customer = Customer.query.filter(
-                func.lower(Customer.email) == form_data["email"]
-            ).first()
-            if existing_customer:
+            existing = Customer.query.filter_by(email=form_data["email"]).first()
+            if existing:
                 errors.append("A customer with that email already exists.")
-
+        
         if not errors:
-            customer = Customer(
-                first_name=form_data["first_name"],
-                last_name=form_data["last_name"],
-                email=form_data["email"],
-                phone=form_data["phone"] or None,
-                street_address=form_data["street_address"] or None,
-                city=form_data["city"] or None,
-                state=form_data["state"] or None,
-                postal_code=form_data["postal_code"] or None,
-                country=form_data["country"],
-                source=form_data["source"] or None,
-            )
             try:
+                customer = Customer(
+                    first_name=form_data["first_name"],
+                    last_name=form_data["last_name"],
+                    email=form_data["email"],
+                    phone=form_data["phone"] or None,
+                    source=form_data["source"] or None,
+                    street_address=form_data["street_address"] or None,
+                    city=form_data["city"] or None,
+                    state=form_data["state"] or None,
+                    postal_code=form_data["postal_code"] or None,
+                    country=form_data["country"],
+                )
                 db.session.add(customer)
                 db.session.commit()
-            except ValueError as exc:
+                flash("Customer created successfully!", "success")
+                return redirect(url_for("customers"))
+            except Exception as e:
                 db.session.rollback()
-                errors.append(str(exc))
-
-        if errors:
-            for error in errors:
-                flash(error, "error")
-        else:
-            flash("Customer created.", "success")
-            return redirect(url_for("customers", search=form_data["email"]))
-
+                flash(f"Error creating customer: {str(e)}", "error")
+        
+        for error in errors:
+            flash(error, "error")
+    
     return render_template(
         "addCustomer.html",
         form_data=form_data,
         source_options=CUSTOMER_SOURCE_OPTIONS,
+        is_edit=False
+    )
+
+@app.route("/edit-customer/<int:customer_id>", methods=["GET", "POST"])
+@require_permission(PERMISSION_CUSTOMERS_EDIT)
+def edit_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    
+    if request.method == "POST":
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        phone = request.form.get('phone')
+        street_address = request.form.get('street_address')
+        city = request.form.get('city')
+        state = request.form.get('state')
+        postal_code = request.form.get('postal_code')
+        country = request.form.get('country')
+        
+        errors = []
+        
+        if not first_name:
+            errors.append("First name is required.")
+        if not last_name:
+            errors.append("Last name is required.")
+        
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return redirect(url_for('edit_customer', customer_id=customer.id))
+        
+        try:
+
+            customer.first_name = first_name
+            customer.last_name = last_name
+            customer.phone = phone
+            customer.street_address = street_address
+            customer.city = city
+            customer.state = state
+            customer.postal_code = postal_code
+            customer.country = country or "USA"
+            
+            db.session.commit()
+            flash(f"Customer {customer.first_name} {customer.last_name} updated successfully!", "success")
+            return redirect(url_for('customers'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating customer: {str(e)}", "error")
+            return redirect(url_for('edit_customer', customer_id=customer.id))
+    
+
+    form_data = {
+        "first_name": customer.first_name,
+        "last_name": customer.last_name,
+        "email": customer.email,
+        "phone": customer.phone or "",
+        "source": customer.source or "",
+        "street_address": customer.street_address or "",
+        "city": customer.city or "",
+        "state": customer.state or "",
+        "postal_code": customer.postal_code or "",
+        "country": customer.country or "USA",
+    }
+    
+    return render_template(
+        "addCustomer.html",
+        form_data=form_data,
+        source_options=CUSTOMER_SOURCE_OPTIONS,
+        is_edit=True,
+        edit_customer_id=customer.id
     )
 
 #help funcion for getting order number
@@ -580,6 +646,19 @@ def generate_order_number():
         new_num = 1
     
     return f"ORD-{year}-{new_num:04d}"
+
+def check_and_update_product_stock(product_id, quantity_used):
+    product = Product.query.get(product_id)
+    if not product:
+        raise ValueError(f"Product ID {product_id} not found")
+    
+    if operation == "subtract":
+        if product.quantity < quantity_used:
+            raise ValueError(f"Not enough stock for {product.name}. Available: {product.stock_quantity}, Requested: {quantity_used}")
+        product.quantity -= quantity_used
+    
+    return product
+
 
 @app.route("/add-order", methods=["GET", "POST"])
 @require_permission(PERMISSION_ORDERS_EDIT)
@@ -717,11 +796,11 @@ def add_order():
             flash(f"Order {order.order_number} created successfully!", "success")
             return redirect(url_for("orders", search=order.order_number))
         
-        # If there are errors, show them
+
         for error in errors:
             flash(error, "error")
     
-    # GET request or form with errors - show the form
+
     return render_template("addOrder.html", 
                          customers=customers, 
                          products=products,
@@ -729,6 +808,112 @@ def add_order():
                          line_items=line_items,
                          order_platform_options=ORDER_PLATFORM_OPTIONS,
                          order_status_options=ORDER_STATUS_OPTIONS)
+
+@app.route("/edit-order/<int:order_id>", methods=["GET", "POST"])
+@require_permission(PERMISSION_ORDERS_EDIT)
+def edit_order(order_id):
+    order = Order.query.get_or_404(order_id)
+    
+    if request.method == "POST":
+
+        platform = request.form.get('platform')
+        status = request.form.get('status')
+        placed_at_str = request.form.get('placed_at')
+        product_ids = request.form.getlist('product_id')
+        quantities = request.form.getlist('quantity')
+        unit_prices = request.form.getlist('unit_price')
+        
+        errors = []
+        
+        if not platform:
+            errors.append("Platform is required.")
+        
+        if not product_ids or not product_ids[0]:
+            errors.append("At least one product is required.")
+        
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return redirect(url_for('edit_order', order_id=order.id))
+        
+        try:
+
+            order.platform = platform
+            order.status = status
+            if placed_at_str:
+                order.placed_at = datetime.strptime(placed_at_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+            order.updated_at = utc_now()
+            
+
+            OrderItem.query.filter_by(order_id=order.id).delete()
+            
+
+            total_amount = Decimal('0.00')
+            for i, product_id in enumerate(product_ids):
+                if product_id:
+                    quantity = int(quantities[i]) if i < len(quantities) else 1
+                    unit_price = Decimal(unit_prices[i]) if i < len(unit_prices) else 0
+                    item_total = unit_price * quantity
+                    total_amount += item_total
+                    
+                    order_item = OrderItem(
+                        order_id=order.id,
+                        product_id=int(product_id),
+                        quantity=quantity,
+                        unit_price=unit_price
+                    )
+                    db.session.add(order_item)
+            
+            order.total_amount = total_amount
+            
+
+            db.session.add(OrderStatusEvent(
+                order_id=order.id,
+                event_status=status,
+                message=f"Order updated via edit form"
+            ))
+            
+            db.session.commit()
+            flash(f"Order {order.order_number} updated successfully!", "success")
+            return redirect(url_for('orders'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating order: {str(e)}", "error")
+            return redirect(url_for('edit_order', order_id=order.id))
+    
+
+    form_data = {
+        "customer_id": str(order.customer_id),
+        "platform": order.platform,
+        "status": order.status,
+        "placed_at": order.placed_at.strftime('%Y-%m-%d') if order.placed_at else '',
+    }
+    
+
+    line_items = []
+    for item in order.order_items:
+        line_items.append({
+            "product_id": str(item.product_id),
+            "quantity": str(item.quantity),
+            "unit_price": str(item.unit_price)
+        })
+    
+    customers = Customer.query.order_by(Customer.last_name, Customer.first_name).all()
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
+    
+    return render_template(
+        "addOrder.html", 
+        form_data=form_data,
+        line_items=line_items,
+        customers=customers,
+        products=products,
+        order_platform_options=ORDER_PLATFORM_OPTIONS,
+        order_status_options=ORDER_STATUS_OPTIONS,
+        is_edit=True,  
+        edit_order_id=order.id 
+    )
+
 
 @app.route("/add-inventory", methods=["GET", "POST"])
 @require_permission(PERMISSION_INVENTORY_EDIT)
@@ -799,93 +984,85 @@ def add_inventory():
             flash("Inventory item created.", "success")
             return redirect(url_for("inventory", search=form_data["name"]))
 
-        for error in errors:
-            flash(error, "error")
+        if errors:
+            for error in errors:
+                flash(error, "error")
+    return render_template("addInventoryItem.html", form_data=form_data, is_edit=False)
 
-    return render_template("addInventoryItem.html", form_data=form_data)
-
-@app.route("/add-product", methods=["GET", "POST"])
-@require_permission(PERMISSION_PRODUCTION_EDIT)
-def add_product():
-    form_data = {
-        "name": "",
-        "sku": "",
-        "status": "Active",
-        "price": "",
-        "reorder_threshold": "0",
-        "description": "",
-    }
-    created_product = None
-    created_sku = (request.args.get("created") or "").strip()
-
-    if created_sku:
-        created_product = Product.query.filter_by(sku=created_sku).first()
-
+@app.route("/edit-inventory/<int:item_id>", methods=["GET", "POST"])
+@require_permission(PERMISSION_INVENTORY_EDIT)
+def edit_inventory(item_id):
+    item = Ingredient.query.get_or_404(item_id)
+    
     if request.method == "POST":
-        form_data = {
-            "name": (request.form.get("name") or "").strip(),
-            "sku": (request.form.get("sku") or "").strip(),
-            "status": (request.form.get("status") or "").strip() or "Active",
-            "price": (request.form.get("price") or "").strip(),
-            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip(),
-            "description": (request.form.get("description") or "").strip(),
-        }
-
+        stock_quantity = request.form.get('stock_quantity')
+        unit = request.form.get('unit')
+        supplier_name = request.form.get('supplier_name')
+        supplier_contact = request.form.get('supplier_contact')
+        reorder_threshold = request.form.get('reorder_threshold')
+        
         errors = []
-        price = None
-        reorder_threshold = None
-
-        if not form_data["name"]:
-            errors.append("Product name is required.")
-        if not form_data["sku"]:
-            errors.append("SKU is required.")
-
-        if form_data["sku"]:
-            existing_product = Product.query.filter(
-                func.lower(Product.sku) == form_data["sku"].lower()
-            ).first()
-            if existing_product:
-                errors.append("A product with that SKU already exists.")
-
+        
         try:
-            price = Decimal(form_data["price"])
-            if price < 0:
-                raise ValueError
-        except (InvalidOperation, ValueError):
-            errors.append("Price must be a valid non-negative amount.")
-
-        try:
-            reorder_threshold = int(form_data["reorder_threshold"])
-            if reorder_threshold < 0:
-                raise ValueError
-        except ValueError:
-            errors.append("Reorder threshold must be a non-negative whole number.")
-
-        if form_data["status"] not in {"Active", "Inactive"}:
-            errors.append("Status must be Active or Inactive.")
-
-        if not errors:
-            product = Product(
-                name=form_data["name"],
-                sku=form_data["sku"],
-                description=form_data["description"] or None,
-                price=price,
-                active=form_data["status"] == "Active",
-                reorder_threshold=reorder_threshold,
+            stock_quantity_val = parse_non_negative_decimal(
+                stock_quantity,
+                field_label="Current stock",
             )
-            db.session.add(product)
+        except ValueError as exc:
+            errors.append(str(exc))
+            stock_quantity_val = None
+        
+        try:
+            reorder_threshold_val = parse_non_negative_decimal(
+                reorder_threshold,
+                field_label="Reorder threshold",
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+            reorder_threshold_val = None
+        
+        if not unit:
+            errors.append("Unit is required.")
+        
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return redirect(url_for('edit_inventory', item_id=item.id))
+        
+        try:
+
+            item.stock_quantity = stock_quantity_val
+            item.unit = unit
+            item.supplier_name = supplier_name if supplier_name else None
+            item.supplier_contact = supplier_contact if supplier_contact else None
+            item.reorder_threshold = reorder_threshold_val
+            
             db.session.commit()
-            flash("Product created.", "success")
-            return redirect(url_for("add_product", created=product.sku))
+            flash(f"Inventory item '{item.name}' updated successfully!", "success")
+            return redirect(url_for('inventory'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating inventory item: {str(e)}", "error")
+            return redirect(url_for('edit_inventory', item_id=item.id))
+    
 
-        for error in errors:
-            flash(error, "error")
-
+    form_data = {
+        "name": item.name,
+        "stock_quantity": str(item.stock_quantity),
+        "unit": item.unit,
+        "supplier_name": item.supplier_name or "",
+        "supplier_contact": item.supplier_contact or "",
+        "reorder_threshold": str(item.reorder_threshold),
+    }
+    
     return render_template(
-        "addProduct.html",
+        "addInventoryItem.html",
         form_data=form_data,
-        created_product=created_product,
+        is_edit=True,
+        edit_item_id=item.id
     )
+
     
 @app.route("/users")
 @require_permission(
@@ -1444,6 +1621,391 @@ def account_settings():
         **mfa_context,
     )
 
+
+import random
+from datetime import datetime
+
+def generate_batch_code():
+    """Generate a unique batch code like BATCH-2024-001"""
+    year = datetime.now().year
+    # Get the last batch to determine the next number
+    last_batch = Batch.query.order_by(Batch.id.desc()).first()
+    
+    if last_batch and last_batch.batch_code:
+        try:
+            # Extract number from format BATCH-2024-001
+            parts = last_batch.batch_code.split('-')
+            if len(parts) >= 3:
+                last_num = int(parts[-1])
+                new_num = last_num + 1
+            else:
+                new_num = 1
+        except:
+            new_num = 1
+    else:
+        new_num = 1
+    
+    return f"BATCH-{year}-{new_num:03d}"
+
+def generate_lot_number(product_sku):
+    """Generate a lot number based on product SKU, e.g., LOT-LIP001-2024-001"""
+    year = datetime.now().year
+    # Get the last product batch for this product to determine sequence
+    last_batch = ProductBatch.query.order_by(ProductBatch.id.desc()).first()
+    
+    if last_batch and last_batch.lot_number:
+        try:
+            # Extract sequence number from format LOT-SKU-2024-001
+            parts = last_batch.lot_number.split('-')
+            if len(parts) >= 4:
+                last_num = int(parts[-1])
+                new_num = last_num + 1
+            else:
+                new_num = 1
+        except:
+            new_num = 1
+    else:
+        new_num = 1
+    
+    # Create SKU without hyphens for lot number
+    clean_sku = product_sku.replace('-', '')
+    return f"LOT-{clean_sku}-{year}-{new_num:03d}"
+
+
+@app.route("/product-batches")
+@require_permission(PERMISSION_INVENTORY_VIEW)
+def product_batches():
+    search_query = request.args.get("search", "").strip()
+    product_id = request.args.get("product_id", "").strip()
+    stock_status = request.args.get("stock_status", "")
+
+    query = ProductBatch.query
+
+    if search_query:
+        query = query.filter(
+            (ProductBatch.lot_number.ilike(f"%{search_query}%")) |
+            (ProductBatch.product.has(Product.name.ilike(f"%{search_query}%"))) |
+            (ProductBatch.product.has(Product.sku.ilike(f"%{search_query}%")))
+        )
+
+    if product_id:
+        query = query.filter(ProductBatch.product_id == int(product_id))
+
+    if stock_status:
+        if stock_status == "in_stock":
+            query = query.filter(ProductBatch.units_available > 0)
+        elif stock_status == "low_stock":
+            query = query.filter(ProductBatch.units_available <= 10, ProductBatch.units_available > 0)
+        elif stock_status == "out_of_stock":
+            query = query.filter(ProductBatch.units_available == 0)
+        elif stock_status == "expired":
+            query = query.filter(ProductBatch.expiry_date < date.today())
+
+    all_batches = query.options(
+        db.joinedload(ProductBatch.product),
+        db.joinedload(ProductBatch.batch)
+    ).order_by(ProductBatch.created_at.desc()).all()
+
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
+
+    return render_template(
+        "manageProducts.html",
+        all_batches=all_batches,
+        products=products,
+        search_query=search_query,
+        selected_product_id=product_id,
+        selected_stock_status=stock_status,
+        today=date.today()
+    )
+
+@app.route("/manage-products")
+@require_permission(PERMISSION_PRODUCTION_VIEW)
+def manage_products():
+    search_query = request.args.get("search", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    stock_status = request.args.get("stock_status", "").strip()
+
+    query = Product.query
+
+    if search_query:
+        query = query.filter(
+            (Product.name.ilike(f"%{search_query}%")) |
+            (Product.sku.ilike(f"%{search_query}%")) |
+            (Product.description.ilike(f"%{search_query}%"))
+        )
+
+    if status_filter == "active":
+        query = query.filter(Product.active == True)
+    elif status_filter == "inactive":
+        query = query.filter(Product.active == False)
+
+    all_products = query.order_by(Product.name).all()
+
+    # Filter by stock status (requires checking batches)
+    if stock_status:
+        filtered_products = []
+        for product in all_products:
+            total_stock = sum(batch.units_available for batch in product.product_batches)
+            if stock_status == "in_stock" and total_stock > 0:
+                filtered_products.append(product)
+            elif stock_status == "low_stock" and 0 < total_stock <= product.reorder_threshold:
+                filtered_products.append(product)
+            elif stock_status == "out_of_stock" and total_stock == 0:
+                filtered_products.append(product)
+        all_products = filtered_products
+
+    return render_template(
+        "viewProducts.html",
+        all_products=all_products,
+        search_query=search_query,
+        selected_status=status_filter,
+        selected_stock_status=stock_status
+    )
+
+
+@app.route("/add-product", methods=["GET", "POST"])
+@require_permission(PERMISSION_PRODUCTION_EDIT)
+def add_product():
+    form_data = {
+        "name": "",
+        "sku": "",
+
+        "price": "",
+        "reorder_threshold": "0",
+        "units_produced": "",  # User only needs to enter this
+    }
+
+    if request.method == "POST":
+        form_data = {
+            "name": (request.form.get("name") or "").strip(),
+            "sku": (request.form.get("sku") or "").strip(),
+
+            "price": (request.form.get("price") or "").strip(),
+            "reorder_threshold": (request.form.get("reorder_threshold") or "").strip() or "0",
+            "units_produced": (request.form.get("units_produced") or "").strip(),
+        }
+
+        errors = []
+        price = None
+        reorder_threshold = None
+        units_produced = None
+
+        # Product validation
+        if not form_data["name"]:
+            errors.append("Product name is required.")
+        if not form_data["sku"]:
+            errors.append("SKU is required.")
+
+        if form_data["sku"]:
+            existing_product = Product.query.filter(
+                func.lower(Product.sku) == form_data["sku"].lower()
+            ).first()
+            if existing_product:
+                errors.append("A product with that SKU already exists.")
+
+        try:
+            price = Decimal(form_data["price"])
+            if price < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            errors.append("Price must be a valid non-negative amount.")
+
+        try:
+            reorder_threshold = int(form_data["reorder_threshold"])
+            if reorder_threshold < 0:
+                raise ValueError
+        except ValueError:
+            errors.append("Reorder threshold must be a non-negative whole number.")
+
+        # Batch validation - only units produced needed
+        if not form_data["units_produced"]:
+            errors.append("Units produced (initial stock) is required.")
+
+        try:
+            units_produced = int(form_data["units_produced"])
+            if units_produced < 0:
+                raise ValueError
+        except ValueError:
+            errors.append("Units produced must be a non-negative whole number.")
+
+        if not errors:
+            try:
+                # Auto-generate batch code and lot number
+                batch_code = generate_batch_code()
+                lot_number = generate_lot_number(form_data["sku"])
+                
+                # Create the product
+                product = Product(
+                    name=form_data["name"],
+                    sku=form_data["sku"],
+                    price=price,
+                    active=True,
+                    reorder_threshold=reorder_threshold,
+                )
+                db.session.add(product)
+                db.session.flush()  # Get the product ID
+
+                # Create a production batch
+                production_batch = Batch(
+                    batch_code=batch_code,
+                    status="Completed",
+                    started_at=utc_now(),
+                    ended_at=utc_now(),
+                    notes=f"Initial batch for product {form_data['name']}"
+                )
+                db.session.add(production_batch)
+                db.session.flush()  # Get the batch ID
+
+                # Create the product batch (lot)
+                product_batch = ProductBatch(
+                    batch_id=production_batch.id,
+                    product_id=product.id,
+                    lot_number=lot_number,
+                    units_produced=units_produced,
+                    units_available=units_produced,  # Initially, all produced units are available
+                    expiry_date=None,  # Can be set later via edit
+                )
+                db.session.add(product_batch)
+
+                db.session.commit()
+                flash(f"Product {form_data['name']} created! Batch: {batch_code}, Lot: {lot_number}", "success")
+                return redirect(url_for("inventory"))
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error creating product: {str(e)}", "error")
+
+        for error in errors:
+            flash(error, "error")
+
+    return render_template(
+        "addProduct.html",
+        form_data=form_data,
+        is_edit=False
+    )
+
+def generate_lot_number_for_product(product_id, product_sku):
+    """Generate lot number for an existing product"""
+    year = datetime.now().year
+    # Count existing batches for this product
+    batch_count = ProductBatch.query.filter_by(product_id=product_id).count()
+    new_num = batch_count + 1
+    
+    clean_sku = product_sku.replace('-', '')
+    return f"LOT-{clean_sku}-{year}-{new_num:03d}"
+
+
+@app.route("/edit-product-batch/<int:batch_id>", methods=["GET", "POST"])
+@require_permission(PERMISSION_INVENTORY_EDIT)
+def edit_product_batch(batch_id):
+    product_batch = ProductBatch.query.get_or_404(batch_id)
+    
+    if request.method == "POST":
+        units_available = request.form.get("units_available")
+        units_produced = request.form.get("units_produced")
+        expiry_date_str = request.form.get("expiry_date")
+        
+        errors = []
+        
+        if not units_available:
+            errors.append("Units available is required.")
+        
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return redirect(url_for("edit_product_batch", batch_id=product_batch.id))
+        
+        try:
+            if units_available:
+                product_batch.units_available = int(units_available)
+            if units_produced:
+                product_batch.units_produced = int(units_produced)
+            if expiry_date_str:
+                product_batch.expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+            else:
+                product_batch.expiry_date = None
+            
+            db.session.commit()
+            flash(f"Stock updated for batch {product_batch.lot_number}!", "success")
+            return redirect(url_for("product_batches"))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating batch: {str(e)}", "error")
+            return redirect(url_for("edit_product_batch", batch_id=product_batch.id))
+    
+    # GET request - show form with existing data
+    form_data = {
+        "product_id": str(product_batch.product_id),
+        "batch_id": str(product_batch.batch_id),
+        "product_name": product_batch.product.name,  # Add this for display
+        "lot_number": product_batch.lot_number,
+        "units_produced": str(product_batch.units_produced),
+        "units_available": str(product_batch.units_available),
+        "expiry_date": product_batch.expiry_date.strftime("%Y-%m-%d") if product_batch.expiry_date else "",
+    }
+    
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
+    production_batches = Batch.query.order_by(Batch.started_at.desc()).all()
+    
+    return render_template(
+        "addProductBatch.html",
+        form_data=form_data,
+        products=products,
+        production_batches=production_batches,
+        is_edit=True,
+        edit_batch_id=product_batch.id
+    )
+
+@app.route("/edit-product/<int:product_id>", methods=["GET", "POST"])
+@require_permission(PERMISSION_PRODUCTION_EDIT)
+def edit_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    
+    if request.method == "POST":
+        name = request.form.get("name")
+
+        price = request.form.get("price")
+        reorder_threshold = request.form.get("reorder_threshold")
+        
+        errors = []
+        
+        if not name:
+            errors.append("Product name is required.")
+        
+        try:
+            price_val = Decimal(price)
+            if price_val < 0:
+                raise ValueError
+        except (InvalidOperation, ValueError):
+            errors.append("Price must be a valid non-negative amount.")
+        
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return redirect(url_for("edit_product", product_id=product.id))
+        
+        try:
+            product.name = name
+            product.price = price_val
+            product.reorder_threshold = int(reorder_threshold) if reorder_threshold else 0
+            
+            db.session.commit()
+            flash(f"Product {product.name} updated successfully!", "success")
+            return redirect(url_for("inventory"))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating product: {str(e)}", "error")
+    
+    form_data = {
+        "name": product.name,
+        "sku": product.sku,
+        "price": str(product.price),
+        "reorder_threshold": str(product.reorder_threshold),
+    }
+    
+    return render_template("addProduct.html", form_data=form_data, is_edit=True, edit_product_id=product.id)
 
 @app.route("/logout", methods=["POST"])
 @login_required

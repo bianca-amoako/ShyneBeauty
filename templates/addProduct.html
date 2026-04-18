@@ -1,20 +1,21 @@
 {% extends "base_authenticated.html" %}
 {% from "_form_helpers.html" import csrf_input %}
 
-{% block page_title %}Add Product{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Product{% else %}Add Product{% endif %}{% endblock %}
 {% block page_description %}
-
-<p>Create a finished-product record so it can be used in order entry and catalog operations.</p>
-
+  {% if is_edit %}
+    <p>Edit product information below.</p>
+  {% else %}
+    <p>Add a new product. Batch code and lot number will be auto-generated.</p>
+  {% endif %}
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
-  <a class="sb-button" href="{{ url_for('index') }}">Back to dashboard</a>
+  <a class="sb-button" href="{{ url_for('manage_products') }}">View products</a>
 {% endblock %}
 
 {% block content %}
   <div class="sb-panel">
-    <!-- Flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -25,23 +26,37 @@
       {% endif %}
     {% endwith %}
 
-    <!-- Product Form -->
-    <form method="post" action="{{ url_for('add_product') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="post" action="{% if is_edit %}{{ url_for('edit_product', product_id=edit_product_id) }}{% else %}{{ url_for('add_product') }}{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+
+      <h3>Product Information</h3>
+      
       <label><b>Product Name *</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter product name" required>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter product name" value="{{ form_data.name }}" required>
 
       <label><b>SKU *</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="text" name="sku" placeholder="Enter SKU (Stock Keeping Unit)" required>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="sku" placeholder="Enter SKU (e.g., LIP-001)" value="{{ form_data.sku }}" required {% if is_edit %}readonly style="background-color: #f5f5f5;"{% endif %}>
+      {% if is_edit %}<small class="sb-field-note">SKU cannot be changed after creation.</small>{% endif %} 
 
       <label><b>Price *</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="number" name="price" step="0.01" placeholder="0.00" required>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="price" step="0.01" placeholder="0.00" value="{{ form_data.price }}" required>
 
       <label><b>Reorder Threshold</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" placeholder="Minimum stock before reordering" value="10">
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" placeholder="Minimum stock before reordering" value="{{ form_data.reorder_threshold }}">
 
-      <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Product</button>
-      <a href="{{ url_for('index') }}" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
+      {% if not is_edit %}
+        <hr>
+        <h3>Initial Stock</h3>
+        <p class="sb-section-note">Batch code and lot number will be generated automatically.</p>
+
+        <label><b>Units Produced (Initial Stock) *</b></label>
+        <input class="w3-input w3-border w3-margin-bottom" type="number" name="units_produced" placeholder="Number of units produced" value="{{ form_data.units_produced }}" required>
+      {% endif %}
+
+      <div class="sb-form-actions" style="margin-top: 20px;">
+        <button class="sb-button" type="submit">{% if is_edit %}Save Changes{% else %}Create Product{% endif %}</button>
+        <a class="sb-button-secondary" href="{{ url_for('manage_products') }}">Cancel</a>
+      </div>
     </form>
   </div>
 {% endblock %}

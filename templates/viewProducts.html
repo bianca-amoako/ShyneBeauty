@@ -1,0 +1,196 @@
+{% extends "base_authenticated.html" %}
+
+{% block page_title %}Manage Products{% endblock %}
+{% block page_description %}
+  <p>Manage your product catalog, track stock levels, and view batch information.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button" href="{{ url_for('add_product') }}">Add Product</a>
+  <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
+{% endblock %}
+
+{% block content %}
+  {% set summary = namespace(total=0, active=0, low_stock=0, out_of_stock=0) %}
+  {% for product in all_products %}
+    {% set summary.total = summary.total + 1 %}
+    {% if product.active %}
+      {% set summary.active = summary.active + 1 %}
+    {% endif %}
+    {% set total_stock = product.product_batches|sum(attribute='units_available') %}
+    {% if total_stock == 0 %}
+      {% set summary.out_of_stock = summary.out_of_stock + 1 %}
+    {% elif total_stock <= product.reorder_threshold %}
+      {% set summary.low_stock = summary.low_stock + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  <section class="sb-grid sb-grid-4">
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.total }}</strong>
+      <span>Total Products</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.active }}</strong>
+      <span>Active Products</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.low_stock }}</strong>
+      <span>Low Stock</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.out_of_stock }}</strong>
+      <span>Out of Stock</span>
+    </article>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <form class="sb-form-grid" method="get" action="{{ url_for('manage_products') }}">
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="products-search" type="text" name="search" placeholder=" " value="{{ search_query or '' }}">
+          <label for="products-search">Search Products</label>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="products-status">Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="products-status" name="status">
+              <option value="">All Statuses</option>
+              <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+              <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="products-stock">Stock Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="products-stock" name="stock_status">
+              <option value="">All Stock Levels</option>
+              <option value="in_stock" {% if selected_stock_status == 'in_stock' %}selected{% endif %}>In Stock</option>
+              <option value="low_stock" {% if selected_stock_status == 'low_stock' %}selected{% endif %}>Low Stock</option>
+              <option value="out_of_stock" {% if selected_stock_status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Apply Filters</button>
+        <a class="sb-button-secondary" href="{{ url_for('manage_products') }}">Reset</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="sb-panel">
+    <h2>Product Catalog</h2>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Product list with current stock levels</caption>
+        <thead>
+          <tr>
+            <th scope="col">SKU</th>
+            <th scope="col">Product Name</th>
+            <th scope="col">Price</th>
+            <th scope="col">Stock</th>
+            <th scope="col">Status</th>
+            <th scope="col">Created</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in all_products %}
+            {% set total_stock = product.product_batches|sum(attribute='units_available') %}
+            <tr>
+              <td data-label="SKU">{{ product.sku }}</td>
+              <td data-label="Product Name">
+                {{ product.name }}
+                {% if product.description %}
+                  <small class="sb-subtle" style="display: block;">{{ product.description[:50] }}{% if product.description|length > 50 %}...{% endif %}</small>
+                {% endif %}
+              </td>
+              <td data-label="Price">${{ "%.2f"|format(product.price) }}</td>
+              <td data-label="Stock">
+                <strong>{{ total_stock }}</strong> units
+                {% if total_stock <= product.reorder_threshold and total_stock > 0 %}
+                  <span class="sb-status sb-status-pending" style="font-size: 10px;">Reorder needed</span>
+                {% elif total_stock == 0 %}
+                  <span class="sb-status sb-status-danger" style="font-size: 10px;">Out of stock</span>
+                {% endif %}
+              </td>
+              <td data-label="Status">
+                {% if product.active %}
+                  <span class="sb-status sb-status-active">Active</span>
+                {% else %}
+                  <span class="sb-status sb-status-inactive">Inactive</span>
+                {% endif %}
+              </td>
+              <td data-label="Created">{{ product.created_at.strftime('%Y-%m-%d') if product.created_at else '' }}</td>
+              <td data-label="Actions">
+                <a class="sb-button sb-button-small" href="{{ url_for('edit_product', product_id=product.id) }}">
+                  <i class="fa fa-edit"></i> Edit
+                </a>
+                {% if product.product_batches %}
+                  <a class="sb-button sb-button-small" href="{{ url_for('edit_product_batch', batch_id=product.product_batches[0].id) }}">
+                    <i class="fa fa-cubes"></i> Stock
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="sb-empty">No products match the current filters. <a href="{{ url_for('add_product') }}">Add a product</a> to get started.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+<section class="sb-grid sb-grid-2" style="margin-top: 16px;">
+  <section class="sb-panel">
+    <h2>Low Stock Alerts</h2>
+    <ul class="sb-list">
+      {% for product in all_products %}
+        {% set total_stock = product.product_batches|sum(attribute='units_available') %}
+        {% if total_stock <= product.reorder_threshold and total_stock > 0 %}
+          <li>
+            <strong>{{ product.name }}</strong> ({{ product.sku }}) - 
+            {{ total_stock }} units left. Reorder at {{ product.reorder_threshold }} units.
+            {% if product.product_batches %}
+              <a href="{{ url_for('edit_product_batch', batch_id=product.product_batches[0].id) }}" class="sb-button sb-button-tiny">Update Stock</a>
+            {% endif %}
+          </li>
+        {% endif %}
+      {% else %}
+        <li>No low stock alerts.</li>
+      {% endfor %}
+    </ul>
+  </section>
+  <section class="sb-panel">
+    <h2>Quick Stats</h2>
+    <dl class="sb-meta-list">
+      <div>
+        <dt>Average Price</dt>
+        <dd>
+          {% if all_products %}
+            {% set total_price = 0 %}
+            {% for product in all_products %}
+              {% set total_price = total_price + product.price %}
+            {% endfor %}
+            ${{ "%.2f"|format(total_price / all_products|length) }}
+          {% else %}
+            $0.00
+          {% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt>Total Products</dt>
+        <dd>{{ all_products|length }}</dd>
+      </div>
+      <div>
+        <dt>Active Products</dt>
+        <dd>{{ all_products|selectattr('active')|list|length }}</dd>
+      </div>
+    </dl>
+  </section>
+</section>{% endblock %}

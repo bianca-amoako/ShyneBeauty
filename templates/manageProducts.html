@@ -1,0 +1,148 @@
+{% extends "base_authenticated.html" %}
+
+{% block page_title %}Product Batches{% endblock %}
+{% block page_description %}
+  <p>Track product batches, lot numbers, and available inventory by batch.</p>
+{% endblock %}
+{% block page_actions %}
+  <a class="sb-button" href="{{ url_for('product_batches') }}">Add Product Batch</a>
+  <a class="sb-button-secondary" href="{{ url_for('index') }}">Back to dashboard</a>
+{% endblock %}
+
+{% block content %}
+  {% set summary = namespace(total_batches=0, total_units=0, low_stock=0, expired=0) %}
+  {% for batch in all_batches %}
+    {% set summary.total_batches = summary.total_batches + 1 %}
+    {% set summary.total_units = summary.total_units + batch.units_available %}
+    {% if batch.units_available <= 10 %}
+      {% set summary.low_stock = summary.low_stock + 1 %}
+    {% endif %}
+    {% if batch.expiry_date and batch.expiry_date < today %}
+      {% set summary.expired = summary.expired + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  <section class="sb-grid sb-grid-4">
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.total_batches }}</strong>
+      <span>Total Batches</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.total_units }}</strong>
+      <span>Total Available Units</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.low_stock }}</strong>
+      <span>Low Stock Batches (&le;10 units)</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ summary.expired }}</strong>
+      <span>Expired Batches</span>
+    </article>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <form class="sb-form-grid" method="get" action="{{ url_for('product_batches') }}">
+      <div class="sb-form-row">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="batches-search" type="text" name="search" placeholder=" " value="{{ search_query or '' }}">
+          <label for="batches-search">Search Batches</label>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="batches-product">Product</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="batches-product" name="product_id">
+              <option value="">All Products</option>
+              {% for product in products %}
+                <option value="{{ product.id }}" {% if selected_product_id == product.id|string %}selected{% endif %}>
+                  {{ product.name }} ({{ product.sku }})
+                </option>
+              {% endfor %}
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="sb-field sb-field-select">
+          <label class="sb-label-above" for="batches-status">Stock Status</label>
+          <div class="sb-select-wrap">
+            <select class="sb-select" id="batches-status" name="stock_status">
+              <option value="">All Statuses</option>
+              <option value="in_stock" {% if selected_stock_status == 'in_stock' %}selected{% endif %}>In Stock (&gt;0)</option>
+              <option value="low_stock" {% if selected_stock_status == 'low_stock' %}selected{% endif %}>Low Stock (&le;10)</option>
+              <option value="out_of_stock" {% if selected_stock_status == 'out_of_stock' %}selected{% endif %}>Out of Stock (0)</option>
+              <option value="expired" {% if selected_stock_status == 'expired' %}selected{% endif %}>Expired</option>
+            </select>
+            <span class="sb-select-arrow" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sb-form-actions">
+        <button class="sb-button" type="submit">Apply Filters</button>
+        <a class="sb-button-secondary" href="{{ url_for('product_batches') }}">Reset</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="sb-panel">
+    <h2>Product Batches</h2>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Product batches and available inventory</caption>
+        <thead>
+          <tr>
+            <th scope="col">Lot Number</th>
+            <th scope="col">Product</th>
+            <th scope="col">Batch Code</th>
+            <th scope="col">Produced</th>
+            <th scope="col">Available</th>
+            <th scope="col">Expiry Date</th>
+            <th scope="col">Status</th>
+            <th scope="col">Created</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for batch in all_batches %}
+            <tr>
+              <td data-label="Lot Number">{{ batch.lot_number }}</td>
+              <td data-label="Product">{{ batch.product.name }} ({{ batch.product.sku }})</td>
+              <td data-label="Batch Code">{{ batch.batch.batch_code if batch.batch else 'N/A' }}</td>
+              <td data-label="Produced">{{ batch.units_produced }}</td>
+              <td data-label="Available">
+                <strong>{{ batch.units_available }}</strong>
+                {% if batch.units_available <= batch.units_produced * 0.1 and batch.units_available > 0 %}
+                  <span class="sb-status sb-status-pending" style="font-size: 10px;">Low</span>
+                {% endif %}
+              </td>
+              <td data-label="Expiry Date">
+                {{ batch.expiry_date.strftime('%Y-%m-%d') if batch.expiry_date else 'N/A' }}
+                {% if batch.expiry_date and batch.expiry_date < today %}
+                  <span class="sb-status sb-status-danger" style="font-size: 10px;">Expired</span>
+                {% endif %}
+              </td>
+              <td data-label="Status">
+                {% if batch.units_available == 0 %}
+                  <span class="sb-status sb-status-danger">Out of Stock</span>
+                {% elif batch.units_available <= 10 %}
+                  <span class="sb-status sb-status-pending">Low Stock</span>
+                {% else %}
+                  <span class="sb-status sb-status-active">In Stock</span>
+                {% endif %}
+              </td>
+              <td data-label="Created">{{ batch.created_at.strftime('%Y-%m-%d') if batch.created_at else '' }}</td>
+              <td data-label="Actions">
+                <a class="sb-button sb-button-small" href="{{ url_for('edit_product_batch', batch_id=batch.id) }}">
+                  <i class="fa fa-edit"></i> Edit
+                </a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="9" class="sb-empty">No product batches match the current filters.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

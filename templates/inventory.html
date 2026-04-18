@@ -163,6 +163,11 @@
                   <span class="sb-status sb-status-active">In Stock</span>
                 {% endif %}
               </td>
+              <td data-label="Actions">
+  <a class="sb-button sb-button-small" href="{{ url_for('edit_inventory', item_id=item.id) }}">
+    <i class="fa fa-edit"></i> Edit
+  </a>
+</td>
             </tr>
           {% else %}
             <tr>

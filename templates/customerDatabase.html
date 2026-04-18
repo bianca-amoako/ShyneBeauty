@@ -80,6 +80,7 @@
             <th scope="col">Source</th>
             <th scope="col">Orders</th>
             <th scope="col">Created</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -90,11 +91,16 @@
               <td data-label="Phone">{{ customer.phone or "Not provided" }}</td>
               <td data-label="Source">{{ customer.source or "Unknown" }}</td>
               <td data-label="Orders">{{ customer.orders|length }}</td>
-              <td data-label="Created">{{ customer.created_at }}</td>
+              <td data-label="Created">{{ customer.created_at.strftime('%Y-%m-%d') if customer.created_at else '' }}</td>
+              <td data-label="Actions">
+                <a class="sb-button sb-button-small" href="{{ url_for('edit_customer', customer_id=customer.id) }}">
+                  <i class="fa fa-edit"></i> Edit
+                </a>
+              </td>
             </tr>
           {% else %}
             <tr>
-              <td colspan="6" class="sb-empty">No customers match the current filters.</td>
+              <td colspan="7" class="sb-empty">No customers match the current filters.</td>
             </tr>
           {% endfor %}
         </tbody>

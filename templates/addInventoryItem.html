@@ -1,9 +1,13 @@
 {% extends "base_authenticated.html" %}
 {% from "_form_helpers.html" import csrf_input %}
 
-{% block page_title %}Add Inventory Item{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Inventory Item{% else %}Add Inventory Item{% endif %}{% endblock %}
 {% block page_description %}
-  <p>Add a new ingredient or inventory item to the database.</p>
+  {% if is_edit %}
+    <p>Edit inventory item #{{ edit_item_id }}. Update stock information below.</p>
+  {% else %}
+    <p>Add a new ingredient or inventory item to the database.</p>
+  {% endif %}
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Back to add menu</a>
@@ -24,38 +28,41 @@
     {% endwith %}
 
     <!-- Inventory Form -->
-    <form method="post" action="{{ url_for('add_inventory') }}">
+    <form method="post" action="{% if is_edit %}{{ url_for('edit_inventory', item_id=edit_item_id) }}{% else %}{{ url_for('add_inventory') }}{% endif %}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
 
       <label><b>Item Name *</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter item name (e.g., Beeswax, Shea Butter)" required>
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="name" placeholder="Enter item name (e.g., Beeswax, Shea Butter)" value="{{ form_data.name }}" required {% if is_edit %}readonly style="background-color: #f5f5f5;"{% endif %}>
+      {% if is_edit %}
+        <small class="sb-field-note">Item name cannot be changed after creation.</small>
+      {% endif %}
 
       <label><b>Stock Quantity *</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="number" name="stock_quantity" step="0.001" placeholder="Current stock quantity" required>
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="stock_quantity" step="0.001" placeholder="Current stock quantity" value="{{ form_data.stock_quantity }}" required>
 
       <label><b>Unit *</b></label>
       <select class="w3-select w3-border w3-margin-bottom" name="unit" required>
         <option value="">Select Unit</option>
-        <option value="g">Grams (g)</option>
-        <option value="kg">Kilograms (kg)</option>
-        <option value="ml">Milliliters (ml)</option>
-        <option value="L">Liters (L)</option>
-        <option value="oz">Ounces (oz)</option>
-        <option value="lb">Pounds (lb)</option>
-        <option value="each">Each</option>
-        <option value="piece">Piece</option>
+        <option value="g" {% if form_data.unit == 'g' %}selected{% endif %}>Grams (g)</option>
+        <option value="kg" {% if form_data.unit == 'kg' %}selected{% endif %}>Kilograms (kg)</option>
+        <option value="ml" {% if form_data.unit == 'ml' %}selected{% endif %}>Milliliters (ml)</option>
+        <option value="L" {% if form_data.unit == 'L' %}selected{% endif %}>Liters (L)</option>
+        <option value="oz" {% if form_data.unit == 'oz' %}selected{% endif %}>Ounces (oz)</option>
+        <option value="lb" {% if form_data.unit == 'lb' %}selected{% endif %}>Pounds (lb)</option>
+        <option value="each" {% if form_data.unit == 'each' %}selected{% endif %}>Each</option>
+        <option value="piece" {% if form_data.unit == 'piece' %}selected{% endif %}>Piece</option>
       </select>
 
       <label><b>Supplier Name</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_name" placeholder="Enter supplier name">
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_name" placeholder="Enter supplier name" value="{{ form_data.supplier_name }}">
 
       <label><b>Supplier Contact</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_contact" placeholder="Email or phone number">
+      <input class="w3-input w3-border w3-margin-bottom" type="text" name="supplier_contact" placeholder="Email or phone number" value="{{ form_data.supplier_contact }}">
 
       <label><b>Reorder Threshold</b></label>
-      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" step="0.001" placeholder="Minimum stock before reordering" value="0">
+      <input class="w3-input w3-border w3-margin-bottom" type="number" name="reorder_threshold" step="0.001" placeholder="Minimum stock before reordering" value="{{ form_data.reorder_threshold }}">
 
-      <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> Save Inventory Item</button>
+      <button type="submit" class="w3-button sb-button"><i class="fa fa-save"></i> {% if is_edit %}Save Changes{% else %}Save Inventory Item{% endif %}</button>
       <a href="{{ url_for('inventory') }}" class="w3-button sb-button-warm"><i class="fa fa-times"></i> Cancel</a>
     </form>
   </div>

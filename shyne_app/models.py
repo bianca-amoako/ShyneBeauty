@@ -449,7 +449,7 @@ class Product(db.Model):
     created_at = db.Column(
         db.DateTime(timezone=True), default=utc_now, nullable=False
     )
-
+    
     order_items = db.relationship("OrderItem", back_populates="product", lazy=True)
     product_batches = db.relationship("ProductBatch", back_populates="product", lazy=True)
 
