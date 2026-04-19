@@ -268,7 +268,6 @@ def test_routes_are_registered(app):
     assert "/users" in routes
     assert "/change-password" in routes
     assert "/account/settings" in routes
-    assert "/tasks" in routes
     assert "/logout" in routes
 
 
@@ -280,10 +279,10 @@ def test_load_user_returns_none_when_auth_table_is_unavailable(app):
         assert load_user("1") is None
 
 
-def test_tasks_route_renders_live_operational_sections(client, admin_user, login):
+def test_index_renders_operational_sections(client, admin_user, login):
     login(client)
 
-    response = client.get("/tasks")
+    response = client.get("/")
 
     assert response.status_code == 200
     assert b"Order Intake Review" in response.data
@@ -294,12 +293,12 @@ def test_tasks_route_renders_live_operational_sections(client, admin_user, login
     assert b"Inventory items needing attention" in response.data
 
 
-def test_tasks_route_surfaces_live_and_empty_operational_states(
+def test_index_surfaces_live_and_empty_operational_states(
     client, admin_user, app, login
 ):
     login(client)
 
-    empty_response = client.get("/tasks")
+    empty_response = client.get("/")
 
     assert empty_response.status_code == 200
     assert b"No orders are currently waiting for intake review." in empty_response.data
@@ -388,7 +387,7 @@ def test_tasks_route_surfaces_live_and_empty_operational_states(
         )
         db.session.commit()
 
-    response = client.get("/tasks")
+    response = client.get("/")
 
     assert response.status_code == 200
     assert b"ORD-TASKS-PLACED" in response.data

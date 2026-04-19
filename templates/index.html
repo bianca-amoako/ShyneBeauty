@@ -118,4 +118,156 @@
       <li>Use <a class="sb-link" href="{{ url_for('inventory') }}">Inventory Page</a> to check stock constraints before production work begins.</li>
     </ul>
   </section>
+
+  <section class="sb-grid sb-grid-3" style="margin-top: 16px;">
+    <article class="sb-panel sb-metric">
+      <strong>{{ intake_count }}</strong>
+      <span>Orders awaiting intake review</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ shipping_count }}</strong>
+      <span>Orders ready for shipping handoff</span>
+    </article>
+    <article class="sb-panel sb-metric">
+      <strong>{{ inventory_attention_count }}</strong>
+      <span>Inventory items needing attention</span>
+    </article>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Order Intake Review</h2>
+    <p class="sb-section-note">
+      Confirm customer details, source records, and line items for newly placed orders before work moves forward.
+      Use <a class="sb-link" href="{{ url_for('orders') }}">Manage Orders</a> for the full order queue and
+      <a class="sb-link" href="{{ url_for('customers') }}">Customers</a> to verify contact details.
+    </p>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Orders currently in placed status</caption>
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Source</th>
+            <th scope="col">Items</th>
+            <th scope="col">Placed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in intake_orders %}
+            <tr>
+              <td data-label="Order">{{ order.order_number }}</td>
+              <td data-label="Customer">{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+              <td data-label="Source">{{ order.platform }}</td>
+              <td data-label="Items">
+                {% for item in order.order_items %}
+                  {{ item.product.name }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  No line items
+                {% endfor %}
+              </td>
+              <td data-label="Placed">{{ order.placed_at }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No orders are currently waiting for intake review.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Shipping Handoff</h2>
+    <p class="sb-section-note">
+      Review ready orders, confirm carrier details, and make sure tracking is present before final handoff.
+    </p>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Orders ready for shipping</caption>
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Items</th>
+            <th scope="col">Shipment</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in shipping_orders %}
+            <tr>
+              <td data-label="Order">{{ order.order_number }}</td>
+              <td data-label="Customer">{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+              <td data-label="Items">
+                {% for item in order.order_items %}
+                  {{ item.product.name }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  No line items
+                {% endfor %}
+              </td>
+              <td data-label="Shipment">
+                {% if order.shipment and order.shipment.tracking_number %}
+                  {{ order.shipment.carrier or "Carrier pending" }}: {{ order.shipment.tracking_number }}
+                {% elif order.shipment %}
+                  {{ order.shipment.carrier or "Carrier pending" }}: Tracking pending
+                {% else %}
+                  Shipment not created
+                {% endif %}
+              </td>
+              <td data-label="Status"><span class="sb-status sb-status-active">{{ order.status }}</span></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No orders are currently ready for shipping handoff.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sb-panel" style="margin-top: 16px;">
+    <h2>Inventory Attention</h2>
+    <p class="sb-section-note">
+      Triage ingredients and supplies that are low or out of stock before they block production work.
+      Use <a class="sb-link" href="{{ url_for('inventory') }}">Inventory</a> for the full stock view.
+    </p>
+    <div class="sb-table-wrap">
+      <table class="sb-data-table sb-responsive-table">
+        <caption>Inventory items at or below reorder threshold</caption>
+        <thead>
+          <tr>
+            <th scope="col">Item</th>
+            <th scope="col">Current Stock</th>
+            <th scope="col">Reorder Level</th>
+            <th scope="col">Supplier</th>
+            <th scope="col">Attention</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in inventory_attention_items %}
+            <tr>
+              <td data-label="Item">{{ item.name }}</td>
+              <td data-label="Current Stock">{{ item.stock_quantity }} {{ item.unit }}</td>
+              <td data-label="Reorder Level">{{ item.reorder_threshold }} {{ item.unit }}</td>
+              <td data-label="Supplier">{{ item.supplier_name or "Not set" }}</td>
+              <td data-label="Attention">
+                {% if item.stock_quantity == 0 %}
+                  <span class="sb-status sb-status-danger">Out of stock</span>
+                {% else %}
+                  <span class="sb-status sb-status-pending">Low stock</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="sb-empty">No inventory items currently need attention.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 {% endblock %}

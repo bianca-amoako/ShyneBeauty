@@ -18,8 +18,6 @@ protected admin screens plus a live Flask-Admin surface for internal use.
 - `/add-customer`, `/add-order`, `/add-inventory`, and `/add-product` are live
   create workflows gated by business permissions and backed by saved database
   writes.
-- `/tasks` remains a protected prototype workflow page and is not backed by a
-  persisted task model yet.
 - `/admin/` is protected behind admin authentication and exposes registered
   business tables through Flask-Admin for local/internal development work.
 - CI runs pytest on Python 3.10 and 3.12, CodeQL analysis, dependency review
@@ -184,7 +182,7 @@ GitHub Actions workflows:
 - the generic pytest matrix excludes the `a11y_smoke` marker so browser-only
   checks do not run without Playwright Chromium installed
 - `.github/workflows/pytest.yml` runs Playwright-based accessibility smoke
-  coverage for `/login`, `/`, `/orders`, `/tasks`, and `/account/settings` in
+  coverage for `/login`, `/`, `/orders`, and `/account/settings` in
   the dedicated `a11y-smoke` job after installing Chromium
 - `.github/workflows/codeql.yml` runs CodeQL security analysis
 - `.github/workflows/dependency-review.yml` blocks pull requests that introduce

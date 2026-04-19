@@ -20,7 +20,7 @@ from shyne import (
 
 
 @pytest.mark.parametrize(
-    "route", ["/", "/orders", "/tasks", "/customers", "/inventory", "/users", "/admin/"]
+    "route", ["/", "/orders", "/customers", "/inventory", "/users", "/admin/"]
 )
 def test_anonymous_access_to_protected_routes_redirects_to_login(client, route):
     response = client.get(route)
@@ -496,7 +496,6 @@ def test_seeded_demo_user_still_locks_after_repeated_failed_attempts(client, app
     [
         ("/", b"Dashboard"),
         ("/orders", b"Manage Orders"),
-        ("/tasks", b"Tasks"),
         ("/customers", b"Customer Database"),
         ("/inventory", b"Inventory"),
         ("/users", b"Users & Access"),
@@ -539,7 +538,7 @@ def test_temporary_password_login_redirects_to_forced_password_change(
     assert "next=/orders" in response.headers["Location"]
 
 
-@pytest.mark.parametrize("route", ["/", "/orders", "/customers", "/tasks", "/inventory", "/users", "/admin/"])
+@pytest.mark.parametrize("route", ["/", "/orders", "/customers", "/inventory", "/users", "/admin/"])
 def test_users_with_temporary_password_are_redirected_until_password_changes(
     client, admin_factory, login, route
 ):

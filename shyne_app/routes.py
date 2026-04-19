@@ -124,6 +124,32 @@ def index():
         Order.platform == GOOGLE_SHEETS_ORDER_SOURCE
     ).count()
     recent_orders = Order.query.order_by(Order.placed_at.desc()).limit(3).all()
+    intake_orders = (
+        Order.query.options(
+            db.joinedload(Order.customer),
+            db.joinedload(Order.order_items).joinedload(OrderItem.product),
+        )
+        .filter(Order.status == "Placed")
+        .order_by(Order.placed_at.desc())
+        .all()
+    )
+    shipping_orders = (
+        Order.query.options(
+            db.joinedload(Order.customer),
+            db.joinedload(Order.order_items).joinedload(OrderItem.product),
+            db.joinedload(Order.shipment),
+        )
+        .filter(Order.status == "Ready")
+        .order_by(Order.placed_at.desc())
+        .all()
+    )
+    inventory_attention_items = (
+        Ingredient.query.filter(
+            Ingredient.stock_quantity <= Ingredient.reorder_threshold
+        )
+        .order_by(Ingredient.stock_quantity.asc(), Ingredient.name.asc())
+        .all()
+    )
     return render_template(
         "index.html",
         total_orders=total_orders,
@@ -133,6 +159,12 @@ def index():
         google_orders=google_orders,
         recent_orders=recent_orders,
         completed_orders=completed_orders,
+        intake_orders=intake_orders,
+        intake_count=len(intake_orders),
+        shipping_orders=shipping_orders,
+        shipping_count=len(shipping_orders),
+        inventory_attention_items=inventory_attention_items,
+        inventory_attention_count=len(inventory_attention_items),
     )
 
 
@@ -355,46 +387,6 @@ def orders():
         selected_status=status,
         order_platform_options=ORDER_PLATFORM_OPTIONS,
         order_status_options=ORDER_STATUS_OPTIONS,
-    )
-
-
-@app.route("/tasks")
-@require_permission(PERMISSION_TASKS_VIEW)
-def tasks():
-    intake_orders = (
-        Order.query.options(
-            db.joinedload(Order.customer),
-            db.joinedload(Order.order_items).joinedload(OrderItem.product),
-        )
-        .filter(Order.status == "Placed")
-        .order_by(Order.placed_at.desc())
-        .all()
-    )
-    shipping_orders = (
-        Order.query.options(
-            db.joinedload(Order.customer),
-            db.joinedload(Order.order_items).joinedload(OrderItem.product),
-            db.joinedload(Order.shipment),
-        )
-        .filter(Order.status == "Ready")
-        .order_by(Order.placed_at.desc())
-        .all()
-    )
-    inventory_attention_items = (
-        Ingredient.query.filter(
-            Ingredient.stock_quantity <= Ingredient.reorder_threshold
-        )
-        .order_by(Ingredient.stock_quantity.asc(), Ingredient.name.asc())
-        .all()
-    )
-    return render_template(
-        "tasks.html",
-        intake_orders=intake_orders,
-        intake_count=len(intake_orders),
-        shipping_orders=shipping_orders,
-        shipping_count=len(shipping_orders),
-        inventory_attention_items=inventory_attention_items,
-        inventory_attention_count=len(inventory_attention_items),
     )
 
 

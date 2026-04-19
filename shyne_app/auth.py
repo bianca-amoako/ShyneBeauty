@@ -312,11 +312,6 @@ def inject_current_admin_label():
                 "visible": has_permission(PERMISSION_PRODUCTION_EDIT),
             },
             {
-                "endpoint": "tasks",
-                "label": "Tasks",
-                "visible": has_permission(PERMISSION_TASKS_VIEW),
-            },
-            {
                 "endpoint": "users",
                 "label": "Users & Access",
                 "visible": has_permission(PERMISSION_USERS_MANAGE),

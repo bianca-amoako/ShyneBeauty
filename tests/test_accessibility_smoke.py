@@ -131,7 +131,6 @@ def collect_accessibility_findings(page):
         ("/login", False),
         ("/", True),
         ("/orders", True),
-        ("/tasks", True),
         ("/account/settings", True),
     ],
 )

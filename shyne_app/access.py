@@ -180,7 +180,7 @@ def is_last_active_superadmin(admin_user, *, now=None):
 
 def role_scope_summary(role_label):
     return {
-        ROLE_STAFF_OPERATOR: "Orders, customers, shipping, tasks",
+        ROLE_STAFF_OPERATOR: "Orders, customers, shipping",
         ROLE_INVENTORY_PRODUCTION: "Inventory, production, stock",
         ROLE_SUPERADMIN: "Business admin and users",
         ROLE_DEV_ADMIN: "Technical console access",
