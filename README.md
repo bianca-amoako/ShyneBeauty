@@ -68,6 +68,8 @@ Optional variables:
 - `APP_RUNTIME=demo-dev|live-prod`
 - `DATABASE_URL`
 - `AUTH_DATABASE_URL`
+- `SHYNE_LOG_DIR` to override the default `instance/logs` directory
+- `DISABLE_FILE_LOGGING=true` to disable the rotating file logger
 - `FLASK_DEBUG=true` for debugging only
 - `SESSION_COOKIE_SECURE=true` for HTTPS
 - `TRUST_PROXY_HEADERS=true` only when the app is behind a trusted reverse proxy
