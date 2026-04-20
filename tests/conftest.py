@@ -38,6 +38,8 @@ from shyne import app as flask_app
 from shyne import db
 from shyne import utc_now
 
+_UNSET = object()
+
 BASE_SQLALCHEMY_DATABASE_URI = flask_app.config["SQLALCHEMY_DATABASE_URI"]
 BASE_SQLALCHEMY_BINDS = dict(flask_app.config["SQLALCHEMY_BINDS"])
 BASE_APP_RUNTIME = flask_app.config["APP_RUNTIME"]
@@ -154,6 +156,7 @@ def admin_user(app):
         user.set_password("correct-horse-battery-staple")
         user.set_role(ROLE_SUPERADMIN, now=utc_now())
         user.set_account_status(ACCOUNT_STATUS_ACTIVE, now=utc_now())
+        user.mfa_enroll_dismissed_at = utc_now()
         db.session.add(user)
         db.session.commit()
         return user.id
@@ -179,6 +182,7 @@ def admin_factory(app):
             must_enroll_mfa=False,
             mfa_enabled=False,
             mfa_totp_secret=None,
+            mfa_enroll_dismissed_at=_UNSET,
         ):
             created_count["value"] += 1
             comparison_time = utc_now()
@@ -204,6 +208,13 @@ def admin_factory(app):
                 user.invited_by_user_id = 1
             user.must_change_password = must_change_password
             user.must_enroll_mfa = must_enroll_mfa
+            if mfa_enroll_dismissed_at is _UNSET:
+                if role in {ROLE_SUPERADMIN, ROLE_DEV_ADMIN} and not mfa_enabled:
+                    user.mfa_enroll_dismissed_at = comparison_time
+                else:
+                    user.mfa_enroll_dismissed_at = None
+            else:
+                user.mfa_enroll_dismissed_at = mfa_enroll_dismissed_at
             if mfa_enabled:
                 user.mfa_enabled = True
                 user.mfa_totp_secret = mfa_totp_secret or pyotp.random_base32()

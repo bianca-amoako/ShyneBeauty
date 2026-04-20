@@ -82,6 +82,22 @@ def _find_or_create_ip_throttle(ip_address):
     return throttle
 
 
+def _record_login_event(email, ip, success, failure_reason=None, user_agent=None):
+    try:
+        event = AdminLoginEvent(
+            email=(email or "")[:255] or None,
+            ip=(ip or "")[:64] or None,
+            success=bool(success),
+            failure_reason=(failure_reason or None) and str(failure_reason)[:80],
+            user_agent=(user_agent or "")[:255] or None,
+        )
+        db.session.add(event)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        _logger.exception("Failed to persist AdminLoginEvent; continuing login flow.")
+
+
 def _mfa_provisioning_context(admin_user, *, session_key="mfa_enrollment_secret"):
     secret = session.get(session_key)
     if not secret:
@@ -205,11 +221,14 @@ def login():
             now = utc_now()
 
             client_ip = _request_client_ip()
+            user_agent = request.headers.get("User-Agent")
             if throttle.is_locked(now):
                 _logger.warning("login blocked — IP throttle active | ip=%s email=%s", client_ip, email)
+                _record_login_event(email, client_ip, success=False, failure_reason="ip_throttle_locked", user_agent=user_agent)
                 flash("Invalid email or password.", "error")
             elif admin_user and admin_user.is_locked(now):
                 _logger.warning("login blocked — account locked | ip=%s email=%s", client_ip, email)
+                _record_login_event(email, client_ip, success=False, failure_reason="account_locked", user_agent=user_agent)
                 flash("Invalid email or password.", "error")
             elif (
                 admin_user
@@ -228,6 +247,7 @@ def login():
                         session["pending_mfa_next"] = next_url
                     db.session.commit()
                     _logger.info("login: MFA challenge started | ip=%s email=%s", client_ip, email)
+                    _record_login_event(email, client_ip, success=True, failure_reason="mfa_pending", user_agent=user_agent)
                     return redirect(url_for("mfa_challenge"))
 
                 admin_user.last_login_at = now
@@ -236,10 +256,15 @@ def login():
                 session.clear()
                 login_user(admin_user, remember=remember_me)
                 _logger.info("login success | ip=%s email=%s role=%s", client_ip, email, admin_user.get_role())
+                _record_login_event(email, client_ip, success=True, user_agent=user_agent)
                 if admin_user.requires_password_change():
                     if next_url:
                         return redirect(url_for("change_password", next=next_url))
                     return redirect(url_for("change_password"))
+                if user_should_be_nudged_to_enroll_mfa(admin_user):
+                    if next_url:
+                        return redirect(url_for("mfa_enroll", next=next_url))
+                    return redirect(url_for("mfa_enroll"))
                 return redirect_to_safe_next(
                     request.form.get("next") or request.args.get("next"),
                     fallback_endpoint="index",
@@ -250,6 +275,7 @@ def login():
                     admin_user.register_failed_login(now)
                 db.session.commit()
                 _logger.warning("login failed — bad credentials | ip=%s email=%s", client_ip, email)
+                _record_login_event(email, client_ip, success=False, failure_reason="bad_credentials", user_agent=user_agent)
                 flash("Invalid email or password.", "error")
 
     return render_template(
@@ -1521,6 +1547,55 @@ def mfa_challenge():
         "mfa_challenge.html",
         pending_user=pending_user,
         next_url=next_url,
+    )
+
+
+@app.route("/mfa/enroll", methods=["GET", "POST"])
+@login_required
+def mfa_enroll():
+    if current_user.has_mfa_enabled():
+        return redirect(url_for("index"))
+
+    next_url = get_safe_next_target(
+        request.form.get("next") or request.args.get("next")
+    )
+    mfa_context = _mfa_provisioning_context(current_user)
+    role_requires = user_requires_mfa_enrollment(current_user)
+
+    if request.method == "POST":
+        action = (request.form.get("action") or "enable").strip()
+        if action == "skip":
+            session.pop("mfa_enrollment_secret", None)
+            current_user.mfa_enroll_dismissed_at = utc_now()
+            db.session.commit()
+            return redirect_to_safe_next(next_url, fallback_endpoint="index")
+
+        mfa_code = (request.form.get("mfa_code") or "").strip()
+        enrollment_secret = session.get("mfa_enrollment_secret")
+        errors = []
+        if not mfa_code:
+            errors.append("Authentication code is required to enable MFA.")
+        elif not enrollment_secret or not pyotp.TOTP(enrollment_secret).verify(
+            mfa_code, valid_window=1
+        ):
+            errors.append("Enter a valid authentication code.")
+
+        if errors:
+            for error in errors:
+                flash(error, "error")
+        else:
+            comparison_time = utc_now()
+            current_user.enable_mfa(secret=enrollment_secret, now=comparison_time)
+            db.session.commit()
+            session.pop("mfa_enrollment_secret", None)
+            flash("Multi-factor authentication enabled.", "success")
+            return redirect_to_safe_next(next_url, fallback_endpoint="index")
+
+    return render_template(
+        "mfa_enroll.html",
+        next_url=next_url,
+        role_requires_mfa=role_requires,
+        **mfa_context,
     )
 
 

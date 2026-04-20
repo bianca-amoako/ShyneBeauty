@@ -106,6 +106,9 @@ def ensure_admin_user_access_columns():
         "last_mfa_verified_at": (
             "ALTER TABLE admin_users ADD COLUMN last_mfa_verified_at DATETIME"
         ),
+        "mfa_enroll_dismissed_at": (
+            "ALTER TABLE admin_users ADD COLUMN mfa_enroll_dismissed_at DATETIME"
+        ),
     }
 
     with auth_engine.begin() as connection:
@@ -141,6 +144,7 @@ def ensure_runtime_auth_schema_compatibility():
     # and audit table before request-time queries hit the ORM.
     AdminAccessEvent.__table__.create(bind=auth_engine, checkfirst=True)
     AdminLoginThrottle.__table__.create(bind=auth_engine, checkfirst=True)
+    AdminLoginEvent.__table__.create(bind=auth_engine, checkfirst=True)
     ensure_admin_user_access_columns()
 
 
@@ -170,6 +174,7 @@ class AdminUser(UserMixin, db.Model):
     mfa_totp_secret = db.Column(db.String(64))
     mfa_enrolled_at = db.Column(db.DateTime(timezone=True))
     last_mfa_verified_at = db.Column(db.DateTime(timezone=True))
+    mfa_enroll_dismissed_at = db.Column(db.DateTime(timezone=True))
     failed_login_count = db.Column(db.Integer, nullable=False, default=0)
     locked_until = db.Column(db.DateTime(timezone=True))
     last_login_at = db.Column(db.DateTime(timezone=True))
@@ -400,6 +405,21 @@ class AdminLoginThrottle(db.Model):
         self.failed_login_count = 0
         self.locked_until = None
         self.last_failed_at = None
+
+
+class AdminLoginEvent(db.Model):
+    __bind_key__ = AUTH_BIND_KEY
+    __tablename__ = "admin_login_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), index=True)
+    ip = db.Column(db.String(64), index=True)
+    success = db.Column(db.Boolean, nullable=False, index=True)
+    failure_reason = db.Column(db.String(80))
+    user_agent = db.Column(db.String(255))
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=utc_now, nullable=False, index=True
+    )
 
 
 class Customer(db.Model):
