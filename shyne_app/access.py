@@ -154,6 +154,27 @@ def build_add_flow_items(admin_user=None):
     ]
 
 
+MFA_REQUIRED_ROLES = frozenset({ROLE_SUPERADMIN, ROLE_DEV_ADMIN})
+
+
+def mfa_required_for_role(role):
+    return role in MFA_REQUIRED_ROLES
+
+
+def user_requires_mfa_enrollment(admin_user):
+    if admin_user is None:
+        return False
+    if not getattr(admin_user, "is_authenticated", True):
+        return False
+    return mfa_required_for_role(admin_user.get_role()) and not admin_user.has_mfa_enabled()
+
+
+def user_should_be_nudged_to_enroll_mfa(admin_user):
+    if not user_requires_mfa_enrollment(admin_user):
+        return False
+    return getattr(admin_user, "mfa_enroll_dismissed_at", None) is None
+
+
 def is_superadmin(admin_user=None):
     target_user = admin_user or current_user
     return getattr(target_user, "is_authenticated", False) and (

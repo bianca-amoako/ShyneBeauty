@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enroll MFA | ShyneBeauty</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='shyneIcon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shyne.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login-animations.css') }}">
+  <style>
+    .sb-mfa-qr {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 16px auto;
+    }
+    .sb-mfa-qr svg {
+      width: 200px;
+      height: 200px;
+    }
+    .sb-mfa-manual {
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="sb-login-body">
+  {% from "_form_helpers.html" import csrf_input %}
+  <main class="sb-login-shell">
+    <section class="sb-login-panel sb-panel-glass" aria-labelledby="mfa-enroll-heading">
+      <p class="sb-eyebrow">
+        {% if role_requires_mfa %}Recommended for your role{% else %}Optional{% endif %}
+      </p>
+      <h1 id="mfa-enroll-heading">Set Up Multi-Factor Authentication</h1>
+      <p class="sb-helper">
+        {% if role_requires_mfa %}
+          Your role has elevated access, so we strongly recommend enabling an
+          authenticator app. You can skip for now and enroll later from Account
+          Settings.
+        {% else %}
+          Add an authenticator app for extra sign-in security. You can skip and
+          set this up later from Account Settings.
+        {% endif %}
+      </p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="sb-message-stack" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="sb-message sb-message-{{ category }}" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="sb-mfa-qr">{{ qr_svg_markup|safe }}</div>
+      <p class="sb-helper sb-mfa-manual">
+        Manual entry secret:
+        <code class="sb-code">{{ manual_secret }}</code>
+      </p>
+
+      <form class="sb-form-grid" method="post" action="{{ url_for('mfa_enroll') }}" novalidate>
+        {{ csrf_input() }}
+        {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+        {% endif %}
+        <div class="sb-field sb-field-float">
+          <input
+            class="sb-input"
+            id="mfa-code"
+            name="mfa_code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            placeholder=" "
+            spellcheck="false"
+            autofocus
+          >
+          <label for="mfa-code">Authentication Code</label>
+        </div>
+        <div class="sb-form-actions">
+          <button class="sb-submit" type="submit" name="action" value="enable">Enable MFA</button>
+          <button class="sb-button-secondary" type="submit" name="action" value="skip" formnovalidate>Skip for now</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

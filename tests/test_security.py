@@ -8,6 +8,7 @@ from shyne import (
     AUTH_BIND_KEY,
     ACCOUNT_STATUS_ACTIVE,
     ACCOUNT_STATUS_SUSPENDED,
+    AdminLoginEvent,
     AdminLoginThrottle,
     AdminUser,
     HTML_CONTENT_SECURITY_POLICY,
@@ -1387,3 +1388,79 @@ def test_resend_invite_path_is_rate_limited():
     for _ in range(_SENSITIVE_POST_LIMIT):
         check_rate_limit(ip, "/users/99/resend-invite", "POST")
     assert check_rate_limit(ip, "/users/99/resend-invite", "POST") is False
+
+
+def _latest_login_event(app):
+    with app.app_context():
+        return db.session.execute(
+            select(AdminLoginEvent).order_by(AdminLoginEvent.id.desc())
+        ).scalars().first()
+
+
+def test_login_event_recorded_on_successful_login(client, admin_user, app, login):
+    login(client)
+    event = _latest_login_event(app)
+    assert event is not None
+    assert event.success is True
+    assert event.email == "admin@shynebeauty.com"
+    assert event.failure_reason is None
+
+
+def test_login_event_recorded_on_bad_credentials(client, admin_user, app):
+    client.post(
+        "/login",
+        data={"email": "admin@shynebeauty.com", "password": "wrong-password"},
+    )
+    event = _latest_login_event(app)
+    assert event is not None
+    assert event.success is False
+    assert event.failure_reason == "bad_credentials"
+    assert event.email == "admin@shynebeauty.com"
+
+
+def test_mfa_eligible_superadmin_is_nudged_to_enroll_after_login(client, admin_factory, app, login):
+    admin_factory(
+        email="nudge-me@shynebeauty.com",
+        role=ROLE_SUPERADMIN,
+        mfa_enroll_dismissed_at=None,
+    )
+    response = login(client, email="nudge-me@shynebeauty.com")
+    assert response.status_code == 302
+    assert "/mfa/enroll" in response.headers["Location"]
+
+
+def test_mfa_enroll_skip_sets_dismissed_flag_and_redirects(
+    client, admin_factory, app, login, csrf_token_for
+):
+    admin_factory(
+        email="skip-mfa@shynebeauty.com",
+        role=ROLE_SUPERADMIN,
+        mfa_enroll_dismissed_at=None,
+    )
+    login(client, email="skip-mfa@shynebeauty.com")
+    token = csrf_token_for(client, path="/mfa/enroll") if client.application.config.get("WTF_CSRF_ENABLED") else None
+    post_data = {"action": "skip"}
+    if token:
+        post_data["csrf_token"] = token
+    response = client.post("/mfa/enroll", data=post_data)
+    assert response.status_code == 302
+    with app.app_context():
+        user = db.session.execute(
+            select(AdminUser).where(AdminUser.email == "skip-mfa@shynebeauty.com")
+        ).scalar_one()
+        assert user.mfa_enroll_dismissed_at is not None
+
+
+def test_login_event_recorded_on_account_lock(client, admin_user, app):
+    with app.app_context():
+        user = db.session.get(AdminUser, admin_user)
+        user.locked_until = utc_now() + timedelta(minutes=15)
+        db.session.commit()
+    client.post(
+        "/login",
+        data={"email": "admin@shynebeauty.com", "password": "correct-horse-battery-staple"},
+    )
+    event = _latest_login_event(app)
+    assert event is not None
+    assert event.success is False
+    assert event.failure_reason == "account_locked"

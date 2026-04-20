@@ -233,6 +233,8 @@ def enforce_password_change():
     return redirect(url_for("change_password"))
 
 
+
+
 @app.before_request
 def enforce_https():
     if app.config.get("APP_RUNTIME") != APP_RUNTIME_LIVE_PROD:
