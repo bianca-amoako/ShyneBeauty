@@ -1,13 +1,50 @@
 import logging
 import logging.handlers
+import os
+import time
+from pathlib import Path
 
 from .config import *
 from .extensions import app, init_extensions
 
 
-def _configure_logging(runtime: str, log_dir) -> None:
-    log_dir = log_dir if hasattr(log_dir, "mkdir") else __import__("pathlib").Path(log_dir)
-    log_dir.mkdir(exist_ok=True)
+class SafeTimedRotatingFileHandler(logging.handlers.TimedRotatingFileHandler):
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except PermissionError:
+            current_time = int(time.time())
+            next_rollover = self.computeRollover(current_time)
+            while next_rollover <= current_time:
+                next_rollover += self.interval
+            self.rolloverAt = next_rollover
+
+            if self.stream:
+                try:
+                    self.stream.close()
+                except OSError:
+                    pass
+                self.stream = None
+            self.stream = self._open()
+
+
+def _resolve_log_dir(project_root, environ=None) -> Path:
+    environ = environ or os.environ
+    configured_log_dir = (environ.get("SHYNE_LOG_DIR") or "").strip()
+    if configured_log_dir:
+        return Path(configured_log_dir)
+    return Path(project_root) / "instance" / "logs"
+
+
+def _configure_logging(
+    runtime: str,
+    log_dir,
+    *,
+    enable_file_logging: bool = True,
+    logger_name: str = "shynebeauty",
+) -> logging.Logger:
+    log_dir = log_dir if hasattr(log_dir, "mkdir") else Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     level = logging.DEBUG if runtime == APP_RUNTIME_DEMO_DEV else logging.INFO
     fmt = logging.Formatter(
@@ -15,24 +52,37 @@ def _configure_logging(runtime: str, log_dir) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        log_dir / "shynebeauty.log",
-        when="midnight",
-        backupCount=30,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(fmt)
-    file_handler.setLevel(level)
+    logger = logging.getLogger(logger_name)
+    if getattr(logger, "_shyne_logging_configured", False):
+        return logger
+
+    logger.setLevel(level)
+    logger.propagate = False
+    logger._shyne_logging_configured = True
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(fmt)
     console_handler.setLevel(logging.WARNING)
-
-    logger = logging.getLogger("shynebeauty")
-    logger.setLevel(level)
-    logger.addHandler(file_handler)
     logger.addHandler(console_handler)
-    logger.propagate = False
+
+    if not enable_file_logging:
+        return logger
+
+    try:
+        file_handler = SafeTimedRotatingFileHandler(
+            log_dir / "shynebeauty.log",
+            when="midnight",
+            backupCount=30,
+            encoding="utf-8",
+            delay=True,
+        )
+        file_handler.setFormatter(fmt)
+        file_handler.setLevel(level)
+        logger.addHandler(file_handler)
+    except OSError as exc:
+        logger.warning("File logging disabled: %s", exc)
+
+    return logger
 
 
 # Config docs and local setup store dotenv files at project root
@@ -78,7 +128,11 @@ if app.config["APP_RUNTIME"] == APP_RUNTIME_LIVE_PROD and env_flag(
 ):
     raise RuntimeError("FLASK_DEBUG must not be enabled in live-prod.")
 
-_configure_logging(app.config["APP_RUNTIME"], BASE_DIR.parent / "logs")
+_configure_logging(
+    app.config["APP_RUNTIME"],
+    _resolve_log_dir(BASE_DIR.parent),
+    enable_file_logging=not env_flag("DISABLE_FILE_LOGGING", default=False),
+)
 
 _logger = logging.getLogger("shynebeauty.startup")
 _logger.info(

@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -178,6 +179,114 @@ def test_readme_documents_gunicorn_as_linux_production_default():
 
     assert "APP_RUNTIME=live-prod gunicorn --bind 127.0.0.1:8000 shyne:app" in readme
     assert "Live requires explicit `APP_RUNTIME=live-prod`" in readme
+
+
+def test_resolve_log_dir_defaults_to_instance_logs():
+    from shyne_app.app import _resolve_log_dir
+
+    log_dir = _resolve_log_dir(Path("/tmp/shynebeauty-project"), environ={})
+
+    assert log_dir == Path("/tmp/shynebeauty-project/instance/logs")
+
+
+def test_resolve_log_dir_honors_environment_override():
+    from shyne_app.app import _resolve_log_dir
+
+    log_dir = _resolve_log_dir(
+        Path("/tmp/shynebeauty-project"),
+        environ={"SHYNE_LOG_DIR": "/var/log/shynebeauty"},
+    )
+
+    assert log_dir == Path("/var/log/shynebeauty")
+
+
+def test_configure_logging_is_idempotent(tmp_path):
+    from shyne_app.app import _configure_logging
+
+    logger_name = "shynebeauty.test.idempotent"
+    logger = logging.getLogger(logger_name)
+    logger.handlers.clear()
+    logger._shyne_logging_configured = False
+
+    try:
+        _configure_logging(
+            APP_RUNTIME_DEMO_DEV,
+            tmp_path,
+            logger_name=logger_name,
+        )
+        _configure_logging(
+            APP_RUNTIME_DEMO_DEV,
+            tmp_path,
+            logger_name=logger_name,
+        )
+
+        assert len(logger.handlers) == 2
+        assert sum(
+            isinstance(handler, logging.StreamHandler)
+            and not isinstance(handler, logging.handlers.TimedRotatingFileHandler)
+            for handler in logger.handlers
+        ) == 1
+        assert sum(
+            isinstance(handler, logging.handlers.TimedRotatingFileHandler)
+            for handler in logger.handlers
+        ) == 1
+    finally:
+        for handler in list(logger.handlers):
+            handler.close()
+            logger.removeHandler(handler)
+        logger._shyne_logging_configured = False
+
+
+def test_safe_timed_rotating_file_handler_recovers_from_permission_error(
+    monkeypatch, tmp_path
+):
+    from shyne_app.app import SafeTimedRotatingFileHandler
+
+    original_rollover = logging.handlers.TimedRotatingFileHandler.doRollover
+
+    def _raise_permission_error(self):
+        raise PermissionError("rename denied")
+
+    monkeypatch.setattr(
+        logging.handlers.TimedRotatingFileHandler,
+        "doRollover",
+        _raise_permission_error,
+    )
+
+    handler = SafeTimedRotatingFileHandler(
+        tmp_path / "shynebeauty.log",
+        when="midnight",
+        backupCount=1,
+        encoding="utf-8",
+        delay=True,
+    )
+
+    try:
+        handler.rolloverAt = 0
+        handler.doRollover()
+        assert handler.rolloverAt > 0
+
+        record = logging.LogRecord(
+            name="shynebeauty.test",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="after rollover fallback",
+            args=(),
+            exc_info=None,
+        )
+        handler.emit(record)
+
+        assert "after rollover fallback" in (
+            tmp_path / "shynebeauty.log"
+        ).read_text(encoding="utf-8")
+    finally:
+        handler.close()
+        monkeypatch.setattr(
+            logging.handlers.TimedRotatingFileHandler,
+            "doRollover",
+            original_rollover,
+        )
 
 
 def test_app_runtime_sensitive_defaults_are_applied():
