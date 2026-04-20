@@ -1012,6 +1012,11 @@ button {
   text-align: right;
 }
 
+.sb-dashboard-orders-table,
+.sb-source-mix-table {
+  min-width: 0;
+}
+
 .sb-table-wrap {
   overflow-x: auto;
 }

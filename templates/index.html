@@ -7,7 +7,6 @@
 {% endblock %}
 {% block page_actions %}
   <a class="sb-button" href="{{ url_for('orders') }}">Review orders</a>
-  <a class="sb-button-secondary" href="{{ url_for('add_new') }}">Open add flows</a>
 {% endblock %}
 
 {% block content %}
@@ -100,24 +99,8 @@
         </table>
       </div>
 
-      <div class="sb-note-box" style="margin-top: 16px;">
-        <strong>Current emphasis</strong>
-        <p class="sb-copy-muted" style="margin: 8px 0 0;">
-          Use the dashboard to spot shipping bottlenecks quickly, then move into the
-          order and customer views for detail.
-        </p>
-      </div>
     </section>
   </div>
-
-  <section class="sb-panel">
-    <h2>Next Actions</h2>
-    <ul class="sb-list">
-      <li>Review open fulfillment work on <a class="sb-link" href="{{ url_for('orders') }}">Manage Orders</a>.</li>
-      <li>Confirm source records and contact details in <a class="sb-link" href="{{ url_for('customers') }}">Customer Database</a>.</li>
-      <li>Use <a class="sb-link" href="{{ url_for('inventory') }}">Inventory Page</a> to check stock constraints before production work begins.</li>
-    </ul>
-  </section>
 
   <section class="sb-grid sb-grid-3" style="margin-top: 16px;">
     <article class="sb-panel sb-metric">

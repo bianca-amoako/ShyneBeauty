@@ -232,7 +232,6 @@ def test_index_route_links_to_orders_page(client, admin_user, login):
     assert b'href="/orders"' in response.data
     assert b'href="/customers"' in response.data
     assert b"Manage Orders" in response.data
-    assert b"Demo environment" in response.data
 
 
 def test_orders_route_links_back_to_dashboard(client, admin_user, login):

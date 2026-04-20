@@ -73,11 +73,6 @@
     </nav>
 
     <main class="sb-main" id="main-content">
-      {% if runtime_banner_label %}
-        <div class="sb-runtime-banner" role="status" aria-label="{{ runtime_banner_label }}">
-          {{ runtime_banner_label }}
-        </div>
-      {% endif %}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="sb-flash-stack" aria-live="polite">
