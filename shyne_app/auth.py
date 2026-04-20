@@ -307,9 +307,14 @@ def inject_current_admin_label():
                 "visible": any(item["visible"] for item in add_flow_items),
             },
             {
-                "endpoint": "add_product",
-                "label": "Add Product",
-                "visible": has_permission(PERMISSION_PRODUCTION_EDIT),
+                "endpoint": "manage_products",
+                "label": "Products",
+                "visible": has_permission(PERMISSION_PRODUCTION_VIEW),
+            },
+            {
+                "endpoint": "product_batches",
+                "label": "Product Batches",
+                "visible": has_permission(PERMISSION_INVENTORY_VIEW),
             },
             {
                 "endpoint": "users",
@@ -322,11 +327,6 @@ def inject_current_admin_label():
         "current_admin_role_label": role_label,
         "account_settings_available": current_user.is_authenticated
         and not current_user.requires_password_change(),
-        "runtime_banner_label": (
-            "Demo environment"
-            if app.config.get("APP_RUNTIME") == APP_RUNTIME_DEMO_DEV
-            else None
-        ),
         "authenticated_nav_items": [item for item in nav_items if item["visible"]],
         "add_flow_items": [item for item in build_add_flow_items() if item["visible"]]
         if current_user.is_authenticated

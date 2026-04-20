@@ -145,6 +145,12 @@ def build_add_flow_items(admin_user=None):
             "description": "Create a product so it can be used in future order entry.",
             "visible": has_permission(PERMISSION_PRODUCTION_EDIT, admin_user=target_user),
         },
+        {
+            "endpoint": "add_product_batch",
+            "label": "Add Product Batch",
+            "description": "Record a new production lot for an existing product to track batch inventory.",
+            "visible": has_permission(PERMISSION_PRODUCTION_EDIT, admin_user=target_user),
+        },
     ]
 
 

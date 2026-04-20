@@ -537,7 +537,7 @@ def add_customer():
                 db.session.add(customer)
                 db.session.commit()
                 flash("Customer created successfully!", "success")
-                return redirect(url_for("customers"))
+                return redirect(url_for("customers", search=form_data["email"]))
             except Exception as e:
                 db.session.rollback()
                 flash(f"Error creating customer: {str(e)}", "error")
@@ -1885,6 +1885,93 @@ def generate_lot_number_for_product(product_id, product_sku):
     
     clean_sku = product_sku.replace('-', '')
     return f"LOT-{clean_sku}-{year}-{new_num:03d}"
+
+
+@app.route("/add-product-batch", methods=["GET", "POST"])
+@require_permission(PERMISSION_PRODUCTION_EDIT)
+def add_product_batch():
+    form_data = {
+        "product_id": "",
+        "batch_code": "",
+        "lot_number": "",
+        "units_produced": "",
+        "units_available": "",
+        "expiry_date": "",
+    }
+
+    if request.method == "POST":
+        form_data = {
+            "product_id": (request.form.get("product_id") or "").strip(),
+            "batch_code": (request.form.get("batch_code") or "").strip(),
+            "lot_number": (request.form.get("lot_number") or "").strip(),
+            "units_produced": (request.form.get("units_produced") or "").strip(),
+            "units_available": (request.form.get("units_available") or "").strip(),
+            "expiry_date": (request.form.get("expiry_date") or "").strip(),
+        }
+
+        errors = []
+
+        if not form_data["product_id"]:
+            errors.append("Product is required.")
+        if not form_data["batch_code"]:
+            errors.append("Batch code is required.")
+        if not form_data["lot_number"]:
+            errors.append("Lot number is required.")
+        if not form_data["units_produced"]:
+            errors.append("Units produced is required.")
+        if not form_data["units_available"]:
+            errors.append("Units available is required.")
+
+        if form_data["lot_number"] and not errors:
+            existing = ProductBatch.query.filter(
+                func.lower(ProductBatch.lot_number) == form_data["lot_number"].lower()
+            ).first()
+            if existing:
+                errors.append("A product batch with that lot number already exists.")
+
+        if not errors:
+            try:
+                expiry_date = (
+                    datetime.strptime(form_data["expiry_date"], "%Y-%m-%d").date()
+                    if form_data["expiry_date"]
+                    else None
+                )
+                production_batch = Batch(
+                    batch_code=form_data["batch_code"],
+                    status="Completed",
+                    started_at=utc_now(),
+                    ended_at=utc_now(),
+                    notes=f"Batch for lot {form_data['lot_number']}",
+                )
+                db.session.add(production_batch)
+                db.session.flush()
+
+                product_batch = ProductBatch(
+                    batch_id=production_batch.id,
+                    product_id=int(form_data["product_id"]),
+                    lot_number=form_data["lot_number"],
+                    units_produced=int(form_data["units_produced"]),
+                    units_available=int(form_data["units_available"]),
+                    expiry_date=expiry_date,
+                )
+                db.session.add(product_batch)
+                db.session.commit()
+                flash(f"Product batch {form_data['lot_number']} created.", "success")
+                return redirect(url_for("product_batches"))
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error creating product batch: {str(e)}", "error")
+
+        for error in errors:
+            flash(error, "error")
+
+    products = Product.query.filter_by(active=True).order_by(Product.name).all()
+    return render_template(
+        "addProductBatch.html",
+        form_data=form_data,
+        products=products,
+        is_edit=False,
+    )
 
 
 @app.route("/edit-product-batch/<int:batch_id>", methods=["GET", "POST"])
