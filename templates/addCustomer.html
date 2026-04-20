@@ -60,7 +60,7 @@
       
       <div class="sb-form-row">
         <div class="sb-field sb-field-float">
-          <input class="sb-input" id="customer-email" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder=" " value="{{ form_data.email }}" required {% if is_edit %}readonly style="background-color: #f5f5f5;"{% endif %}>
+          <input class="sb-input" id="customer-email" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder=" " value="{{ form_data.email }}" required {% if is_edit %}readonly{% endif %}>
           <label for="customer-email">Email</label>
         </div>
         <div class="sb-field sb-field-float">

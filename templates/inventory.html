@@ -110,9 +110,9 @@
   <section class="sb-panel" style="margin-top:16px;">
     <form class="sb-form-grid" method="get" action="{{ url_for('inventory') }}">
       <div class="sb-form-row">
-        <div class="sb-field">
+        <div class="sb-field sb-field-float">
+          <input class="sb-input" id="inventory-search" type="text" name="search" placeholder=" " value="{{ search_query or '' }}">
           <label for="inventory-search">Search Inventory</label>
-          <input class="sb-input" id="inventory-search" type="text" name="search" placeholder="Search by item name" value="{{ search_query or '' }}">
         </div>
         <div class="sb-field">
           <label for="inventory-status">Stock Status</label>
