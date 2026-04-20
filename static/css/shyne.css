@@ -248,6 +248,32 @@ button {
   font-weight: 700;
 }
 
+.sb-button-small {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 13px;
+  gap: 4px;
+}
+
+.sb-button-tiny {
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.sb-button-warm {
+  background: rgba(232, 213, 189, 0.85);
+  border-color: rgba(200, 168, 130, 0.85);
+  color: var(--sb-text-strong);
+}
+
+.sb-button-warm:hover,
+.sb-button-warm:focus-visible {
+  background: #e0c8a6;
+  color: var(--sb-text-strong);
+}
+
 /* =============================================
    HEADER BRAND & ACCOUNT
    ============================================= */
@@ -432,7 +458,9 @@ button {
 }
 
 .sb-flash,
-.sb-message {
+.sb-message,
+.error-message,
+.success-message {
   padding: 12px 14px;
   border-radius: var(--sb-radius-sm);
   border: 1px solid transparent;
@@ -442,14 +470,16 @@ button {
 }
 
 .sb-flash-error,
-.sb-message-error {
+.sb-message-error,
+.error-message {
   background: #f5ded4;
   color: var(--sb-error-text);
   border-color: #d8aa97;
   border-left-color: #c97b6a;
 }
 
-.sb-flash-success {
+.sb-flash-success,
+.success-message {
   background: #e0efe4;
   color: #3f5c47;
   border-color: #bfd4c5;
@@ -845,6 +875,15 @@ button {
 .sb-textarea:hover:not(:focus) {
   border-bottom-color: var(--sb-border-strong);
   background: rgba(250, 246, 240, 0.70);
+}
+
+.sb-input:read-only,
+.sb-input[readonly],
+.sb-textarea:read-only,
+.sb-textarea[readonly] {
+  background: rgba(232, 224, 212, 0.55);
+  color: var(--sb-text-muted, #6b6a63);
+  cursor: not-allowed;
 }
 
 /* Textarea — floating label starts at top, not center */

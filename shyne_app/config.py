@@ -214,9 +214,9 @@ IP_LOGIN_LOCK_DURATION = timedelta(minutes=15)
 HTML_CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "img-src 'self' data:; "
-    "style-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
     "script-src 'self' 'unsafe-inline'; "
-    "font-src 'self'; "
+    "font-src 'self' https://cdnjs.cloudflare.com; "
     "object-src 'none'; "
     "base-uri 'self'; "
     "frame-ancestors 'self'"
