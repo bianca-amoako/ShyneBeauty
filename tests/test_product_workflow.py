@@ -52,15 +52,14 @@ def test_add_product_creates_product_and_redirects_to_confirmation(
         data={
             "name": "Glow Balm",
             "sku": "GB-001",
-            "status": "Active",
             "price": "24.50",
             "reorder_threshold": "5",
-            "description": "Night repair balm",
+            "units_produced": "100",
         },
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/add-product?created=GB-001")
+    assert response.headers["Location"].endswith("/inventory")
 
     with app.app_context():
         product = Product.query.filter_by(sku="GB-001").one()

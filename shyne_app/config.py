@@ -239,28 +239,28 @@ NO_STORE_ENDPOINTS = {
 }
 DEMO_USER_ACCOUNTS = (
     {
-        "email": "Superadmin@demo.com",
+        "email": "superadmin@demo.com",
         "full_name": "Demo Superadmin",
         "role": ROLE_SUPERADMIN,
         "password": "demo",
         "last_login_at": datetime(2026, 4, 14, 8, 45, tzinfo=timezone.utc),
     },
     {
-        "email": "StaffOperator@demo.com",
+        "email": "staffoperator@demo.com",
         "full_name": "Demo Staff Operator",
         "role": ROLE_STAFF_OPERATOR,
         "password": "demo",
         "last_login_at": datetime(2026, 4, 13, 16, 20, tzinfo=timezone.utc),
     },
     {
-        "email": "InventoryProduction@demo.com",
+        "email": "inventoryproduction@demo.com",
         "full_name": "Demo Inventory / Production",
         "role": ROLE_INVENTORY_PRODUCTION,
         "password": "demo",
         "last_login_at": None,
     },
     {
-        "email": "DevAdmin@demo.com",
+        "email": "devadmin@demo.com",
         "full_name": "Demo Dev Admin",
         "role": ROLE_DEV_ADMIN,
         "password": "demo",

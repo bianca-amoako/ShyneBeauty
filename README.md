@@ -54,10 +54,10 @@ python shyne.py
 
 `flask --app shyne.py init-db` seeds these deterministic example users:
 
-- `olivia.mercer@shynebeauty.com` / `ShyneDemoSuper1!` — `Superadmin`
-- `maya.brooks@shynebeauty.com` / `ShyneDemoStaff1!` — `Staff Operator`
-- `noah.kim@shynebeauty.com` / `ShyneDemoInventory1!` — `Inventory / Production`
-- `devops@shynebeauty.com` / `ShyneDemoDev1!` — `Dev Admin`
+- `superadmin@demo.com` / `demo` — `Superadmin`
+- `staffoperator@demo.com` / `demo` — `Staff Operator`
+- `inventoryproduction@demo.com` / `demo` — `Inventory / Production`
+- `devadmin@demo.com` / `demo` — `Dev Admin`
 
 Use these accounts for local demo and development only. `Dev Admin` remains
 hidden from the `Users & Access` table and is the only seeded role that can

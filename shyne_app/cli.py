@@ -47,16 +47,6 @@ from .models import *
 from .access import *
 from .auth import *
 
-DEMO_USER_ACCOUNTS = [
-    {
-        "email": "superadmin@example.com",
-        "full_name": "Super Admin",
-        "role": "Superadmin",
-        "password": "SuperAdmin123!",
-        "last_login_at": None,
-    },
-]
-
 def init_db_targets_live_data():
     runtime = app.config.get("APP_RUNTIME")
     if runtime == APP_RUNTIME_LIVE_PROD:
