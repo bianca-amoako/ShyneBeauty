@@ -177,7 +177,7 @@ def test_readme_documents_demo_runtime_for_local_dev():
 def test_readme_documents_gunicorn_as_linux_production_default():
     readme = Path("README.md").read_text(encoding="utf-8")
 
-    assert "APP_RUNTIME=live-prod gunicorn --bind 127.0.0.1:8000 shyne:app" in readme
+    assert 'gunicorn -w 1 --threads 4 --bind 127.0.0.1:8000 "shyne_app.app:app"' in readme
     assert "Live requires explicit `APP_RUNTIME=live-prod`" in readme
 
 
