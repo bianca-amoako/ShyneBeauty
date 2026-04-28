@@ -4,16 +4,6 @@
 
 ShyneBeauty is an internal Flask operations app. Only the latest code on `main` is supported.
 
-## Reporting a Vulnerability
-
-Do not open public GitHub issues for security reports.
-
-Report vulnerabilities privately to the project owner at `ber831004@gmail.com`. Include:
-
-- affected module or route
-- reproduction steps
-- impact
-- any suggested mitigation
 
 ## Implemented Controls
 

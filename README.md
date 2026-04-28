@@ -26,7 +26,7 @@ Open `http://localhost:8000/login`. Unset runtime means demo mode (`APP_RUNTIME=
 `flask --app shyne.py init-db` seeds four deterministic users:
 
 | Email | Password | Role |
-|---|---|---|
+
 | `superadmin@demo.com` | `demo` | Superadmin |
 | `staffoperator@demo.com` | `demo` | Staff Operator |
 | `inventoryproduction@demo.com` | `demo` | Inventory / Production |
@@ -57,7 +57,7 @@ flask --app shyne.py create-dev-admin --email tech@shynebeauty.com
 ## Environment variables
 
 | Variable | Default | Purpose |
-|---|---|---|
+
 | `SECRET_KEY` | required | Flask session signing |
 | `APP_RUNTIME` | `demo-dev` | `demo-dev` or `live-prod` |
 | `DATABASE_URL` | see below | Business DB override |
@@ -112,18 +112,13 @@ python -m pytest -q tests/test_accessibility_smoke.py
 - Back up both files together; they split business and auth data.
 - Stop the app before copying or restoring files.
 - Keep a pre-restore snapshot so you can roll back if a restore fails.
-- See the vault at `.internal/shyneBeauty/` for the restore runbook.
 
 ## Repository layout
 
 - `shyne.py` — 8-line entrypoint that exposes `shyne_app.app:app` and runs the dev server.
 - `shyne_app/` — the package: `app`, `config`, `extensions`, `models`, `auth`, `access`, `routes`, `admin`, `cli`, `rate_limit`.
 - `templates/` — Jinja templates for the admin UI.
-- `static/` — shared frontend assets (`shyneIcon.png`, etc.).
+- `static/` — shared frontend assets
 - `tests/` — pytest coverage for auth, CSRF, protected routes, create workflows, CLI, and model behavior.
 - `schema.sql` — reference schema for the business tables.
 - `.github/workflows/` — CI and code-scanning workflows.
-
-## More context
-
-See [CLAUDE.md](CLAUDE.md) for the dual-database design, permission model, auth-flow internals, and the full module map.
