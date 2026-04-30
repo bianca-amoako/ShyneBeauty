@@ -133,7 +133,7 @@ def register_admin_views():
         return
 
     for table_name, model in MODEL_REGISTRY.items():
-        admin.add_view(LiveDataModelView(model, db.session, name=table_name))
+        admin.add_view(LiveDataModelView(model, db, name=table_name))
 
     _admin_views_registered = True
 
