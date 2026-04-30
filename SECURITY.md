@@ -4,7 +4,6 @@
 
 ShyneBeauty is an internal Flask operations app. Only the latest code on `main` is supported.
 
-
 ## Implemented Controls
 
 ### Authentication
